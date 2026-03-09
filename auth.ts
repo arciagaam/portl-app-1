@@ -91,9 +91,15 @@ export const config = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.roleCheckedAt = Date.now();
       }
-      // Handle stale ORGANIZER tokens from before role restructure
-      if (token.role === 'ORGANIZER') {
+
+      // Re-fetch role from DB every 5 minutes to pick up changes
+      const ROLE_REFRESH_MS = 5 * 60 * 1000;
+      if (
+        !token.roleCheckedAt ||
+        Date.now() - (token.roleCheckedAt as number) > ROLE_REFRESH_MS
+      ) {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
@@ -101,9 +107,11 @@ export const config = {
           });
           token.role = dbUser?.role ?? 'USER';
         } catch {
-          token.role = 'USER';
+          // Keep existing role on DB failure
         }
+        token.roleCheckedAt = Date.now();
       }
+
       return token;
     },
     async session({ session, token }) {

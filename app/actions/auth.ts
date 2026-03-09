@@ -4,24 +4,34 @@ import { signIn, signOut } from '@/auth';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { AuthError } from 'next-auth';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import prisma from '@/prisma/client';
+import { prisma } from '@/lib/prisma';
 import { sendPasswordResetEmail } from '@/lib/email';
 import { mainUrl } from '@/lib/url';
+import { checkRateLimit, signInLimiter, signUpLimiter, forgotPasswordLimiter } from '@/lib/rate-limit';
+import { signUpSchema, signInSchema, forgotPasswordSchema, resetPasswordSchema } from '@/lib/validations/auth';
 
 export async function signUpAction(formData: FormData) {
-  const firstName = formData.get('firstName') as string;
-  const lastName = formData.get('lastName') as string;
-  const email = formData.get('email') as string;
-  const password = formData.get('password') as string;
+  const raw = {
+    firstName: formData.get('firstName'),
+    lastName: formData.get('lastName'),
+    email: formData.get('email'),
+    password: formData.get('password'),
+    redirectTo: formData.get('redirectTo') || undefined,
+  };
 
-  if (!email || !password) {
-    return { error: 'Email and password are required' };
+  const parsed = signUpSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
   }
 
-  if (!firstName || !lastName) {
-    return { error: 'First name and last name are required' };
-  }
+  const { firstName, lastName, email, password, redirectTo } = parsed.data;
+
+  const headersList = await headers();
+  const ip = headersList.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const rateLimited = await checkRateLimit(signUpLimiter, ip);
+  if (rateLimited) return rateLimited;
 
   // Check if user already exists
   const existingUser = await prisma.user.findUnique({
@@ -51,28 +61,35 @@ export async function signUpAction(formData: FormData) {
   }
 
   // Sign in the user after successful registration
-  const redirectTo = (formData.get('redirectTo') as string) || '/account';
   await signIn('credentials', {
     email,
     password,
-    redirectTo,
+    redirectTo: redirectTo || '/account',
   });
 }
 
 export async function signInAction(formData: FormData) {
-  const email = formData.get('email') as string;
-  const password = formData.get('password') as string;
-  const callbackUrl = (formData.get('callbackUrl') as string) || '/account';
+  const raw = {
+    email: formData.get('email'),
+    password: formData.get('password'),
+    callbackUrl: formData.get('callbackUrl') || undefined,
+  };
 
-  if (!email || !password) {
-    return { error: 'Email and password are required' };
+  const parsed = signInSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
   }
+
+  const { email, password, callbackUrl } = parsed.data;
+
+  const rateLimited = await checkRateLimit(signInLimiter, email.toLowerCase());
+  if (rateLimited) return rateLimited;
 
   try {
     await signIn('credentials', {
       email,
       password,
-      redirectTo: callbackUrl,
+      redirectTo: callbackUrl || '/account',
     });
   } catch (error) {
     if (error instanceof AuthError) {
@@ -92,11 +109,17 @@ export async function signOutAction() {
 }
 
 export async function forgotPasswordAction(formData: FormData) {
-  const email = (formData.get('email') as string)?.trim().toLowerCase();
+  const raw = { email: formData.get('email') };
 
-  if (!email) {
-    return { error: 'Email is required' };
+  const parsed = forgotPasswordSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
   }
+
+  const { email } = parsed.data;
+
+  const rateLimited = await checkRateLimit(forgotPasswordLimiter, email);
+  if (rateLimited) return rateLimited;
 
   // Always return success to prevent email enumeration
   const successMessage = 'If an account exists with that email, we sent a password reset link.';
@@ -131,16 +154,17 @@ export async function forgotPasswordAction(formData: FormData) {
 }
 
 export async function resetPasswordAction(formData: FormData) {
-  const token = formData.get('token') as string;
-  const password = formData.get('password') as string;
+  const raw = {
+    token: formData.get('token'),
+    password: formData.get('password'),
+  };
 
-  if (!token || !password) {
-    return { error: 'Token and password are required' };
+  const parsed = resetPasswordSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
   }
 
-  if (password.length < 8) {
-    return { error: 'Password must be at least 8 characters' };
-  }
+  const { token, password } = parsed.data;
 
   try {
     const resetToken = await prisma.passwordResetToken.findUnique({

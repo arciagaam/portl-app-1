@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, ChevronRight } from 'lucide-react';
-import type { OrderListItem } from '@/app/actions/orders';
+import type { OrderListItem } from '@/lib/types/order';
 
 interface OrdersListProps {
   orders: OrderListItem[];

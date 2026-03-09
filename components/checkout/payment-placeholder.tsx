@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, CreditCard, Lock } from 'lucide-react';
-import { completeCheckoutAction, type OrderWithRelations } from '@/app/actions/checkout';
+import { completeCheckoutAction } from '@/app/actions/checkout';
+import type { CheckoutOrderWithRelations as OrderWithRelations } from '@/lib/types/order';
 import type { AttendeeData } from './attendee-form';
 
 interface PaymentPlaceholderProps {

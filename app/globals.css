@@ -196,14 +196,40 @@
   }
 }
 
-@layer utilities {
-  .label-editorial {
-    @apply text-xs font-medium uppercase tracking-widest text-muted-foreground;
-  }
+@utility label-editorial {
+  @apply text-xs font-medium uppercase tracking-widest text-muted-foreground;
+}
 
-  .title-editorial {
-    @apply text-sm font-medium uppercase tracking-wide;
+@utility title-editorial {
+  @apply text-sm font-medium uppercase tracking-wide;
+}
+
+@utility text-gradient-purple {
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+@utility hero-glow {
+  background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(139, 92, 246, 0.15), transparent);
+}
+
+@utility section-glow-purple {
+  background: radial-gradient(ellipse 60% 40% at 50% 50%, rgba(139, 92, 246, 0.08), transparent);
+}
+
+@keyframes scroll-bounce {
+  0%, 100% {
+    transform: translateY(0);
   }
+  50% {
+    transform: translateY(6px);
+  }
+}
+
+@utility animate-scroll-bounce {
+  animation: scroll-bounce 2s ease-in-out infinite;
 }
 
 .emoji-picker-container .epr-body::-webkit-scrollbar {

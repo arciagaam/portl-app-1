@@ -139,7 +139,13 @@ export async function updateApplicationStatusAction(
   try {
     const user = await requireAdmin();
 
-    const updateData: any = {
+    const updateData: {
+      status: typeof status;
+      updatedAt: Date;
+      reviewedAt?: Date;
+      reviewedBy?: string;
+      reviewNotes?: string;
+    } = {
       status,
       updatedAt: new Date(),
     };

@@ -2,6 +2,34 @@
 
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
+import type { OrganizerApplicationStatus } from '@/prisma/generated/prisma/client';
+
+// Step-specific schemas for saveApplicationAction
+const pastEventSchema = z.object({ name: z.string(), date: z.string(), venue: z.string(), description: z.string() });
+const venueSchema = z.object({ name: z.string(), type: z.string() });
+const artistsTalentSchema = z.object({ genres: z.array(z.string()), artists: z.array(z.string()) });
+const referenceSchema = z.object({ name: z.string(), contact: z.string(), relationship: z.string() });
+
+const applicationStep1Schema = z.object({
+  pastEvents: z.array(pastEventSchema).optional(),
+  venues: z.array(venueSchema).optional(),
+  artistsTalent: artistsTalentSchema.optional(),
+  references: z.array(referenceSchema).optional(),
+});
+
+const applicationStep2Schema = z.object({
+  governmentIdUrl: z.string().url().startsWith('https://').optional().nullable(),
+  selfieWithIdUrl: z.string().url().startsWith('https://').optional().nullable(),
+  businessIdUrl: z.string().url().startsWith('https://').optional().nullable(),
+});
+
+const applicationStep3Schema = z.object({
+  tosAccepted: z.boolean().optional(),
+  organizerAgreementAccepted: z.boolean().optional(),
+  privacyPolicyAccepted: z.boolean().optional(),
+  communityGuidelinesAccepted: z.boolean().optional(),
+});
 
 
 export async function getTenantAction(subdomain: string) {
@@ -112,6 +140,17 @@ export async function registerOrganizerAction(data: {
       return { error: 'Subdomain can only contain lowercase letters, numbers, and hyphens' };
     }
 
+    // Check against reserved subdomains
+    const RESERVED_SUBDOMAINS = [
+      'admin', 'www', 'api', 'mail', 'ftp', 'app', 'staging', 'dev', 'test',
+      'status', 'help', 'support', 'billing', 'dashboard', 'account', 'auth',
+      'login', 'signup', 'register', 'docs', 'blog', 'shop', 'store', 'cdn',
+      'static', 'assets', 'img', 'images', 'media', 'download', 'uploads',
+    ];
+    if (RESERVED_SUBDOMAINS.includes(data.subdomain)) {
+      return { error: 'This subdomain is reserved. Please choose another one.' };
+    }
+
     // Check if subdomain is already taken
     const existingTenant = await prisma.tenant.findUnique({
       where: { subdomain: data.subdomain },
@@ -166,7 +205,7 @@ export async function registerOrganizerAction(data: {
 export async function saveApplicationAction(
   tenantId: string,
   step: number,
-  data: any,
+  data: unknown,
   shouldExit: boolean = false
 ) {
   try {
@@ -177,6 +216,29 @@ export async function saveApplicationAction(
 
     if (!tenantId) {
       return { error: 'Tenant ID required' };
+    }
+
+    // Validate step-specific data
+    if (step === 1) {
+      const parsed = applicationStep1Schema.safeParse(data);
+      if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message || 'Invalid step 1 data' };
+      }
+      data = parsed.data;
+    } else if (step === 2) {
+      const parsed = applicationStep2Schema.safeParse(data);
+      if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message || 'Invalid step 2 data' };
+      }
+      data = parsed.data;
+    } else if (step === 3) {
+      const parsed = applicationStep3Schema.safeParse(data);
+      if (!parsed.success) {
+        return { error: parsed.error.issues[0]?.message || 'Invalid step 3 data' };
+      }
+      data = parsed.data;
+    } else if (step !== 4) {
+      return { error: 'Invalid step number' };
     }
 
     // Verify user is OWNER of the tenant
@@ -221,34 +283,53 @@ export async function saveApplicationAction(
     }
 
     // Update application based on step
-    const updateData: any = {
+    const updateData: {
+      status: OrganizerApplicationStatus;
+      updatedAt: Date;
+      currentStep?: number;
+      pastEvents?: z.infer<typeof pastEventSchema>[];
+      venuesWorkedWith?: z.infer<typeof venueSchema>[];
+      artistsTalent?: z.infer<typeof artistsTalentSchema>;
+      references?: z.infer<typeof referenceSchema>[];
+      governmentIdUrl?: string | null;
+      selfieWithIdUrl?: string | null;
+      businessIdUrl?: string | null;
+      tosAccepted?: boolean;
+      organizerAgreementAccepted?: boolean;
+      privacyPolicyAccepted?: boolean;
+      communityGuidelinesAccepted?: boolean;
+      submittedAt?: Date;
+    } = {
       status: shouldExit ? 'IN_PROGRESS' : application.status,
       updatedAt: new Date(),
     };
 
     if (step === 1) {
-      // Event Portfolio (4 parts)
-      updateData.pastEvents = data.pastEvents;
-      updateData.venuesWorkedWith = data.venues;
-      updateData.artistsTalent = data.artistsTalent;
-      updateData.references = data.references;
+      // Event Portfolio (4 parts) — validated above
+      const d = data as z.infer<typeof applicationStep1Schema>;
+      updateData.pastEvents = d.pastEvents;
+      updateData.venuesWorkedWith = d.venues;
+      updateData.artistsTalent = d.artistsTalent;
+      updateData.references = d.references;
       if (!shouldExit) {
         updateData.currentStep = 2;
       }
     } else if (step === 2) {
-      // Identity Verification
-      updateData.governmentIdUrl = data.governmentIdUrl;
-      updateData.selfieWithIdUrl = data.selfieWithIdUrl;
-      updateData.businessIdUrl = data.businessIdUrl;
+      // Identity Verification — validated above
+      const d = data as z.infer<typeof applicationStep2Schema>;
+      updateData.governmentIdUrl = d.governmentIdUrl;
+      updateData.selfieWithIdUrl = d.selfieWithIdUrl;
+      updateData.businessIdUrl = d.businessIdUrl;
       if (!shouldExit) {
         updateData.currentStep = 3;
       }
     } else if (step === 3) {
-      // Agreements
-      updateData.tosAccepted = data.tosAccepted;
-      updateData.organizerAgreementAccepted = data.organizerAgreementAccepted;
-      updateData.privacyPolicyAccepted = data.privacyPolicyAccepted;
-      updateData.communityGuidelinesAccepted = data.communityGuidelinesAccepted;
+      // Agreements — validated above
+      const d = data as z.infer<typeof applicationStep3Schema>;
+      updateData.tosAccepted = d.tosAccepted;
+      updateData.organizerAgreementAccepted = d.organizerAgreementAccepted;
+      updateData.privacyPolicyAccepted = d.privacyPolicyAccepted;
+      updateData.communityGuidelinesAccepted = d.communityGuidelinesAccepted;
       if (!shouldExit) {
         updateData.currentStep = 4;
       }

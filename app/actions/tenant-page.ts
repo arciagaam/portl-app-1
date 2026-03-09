@@ -8,6 +8,10 @@ import type { TenantBrandingFormData } from '@/lib/validations/tenant-page';
 
 const MAX_TENANT_IMAGES = 12;
 
+function isValidStorageUrl(url: string | null): boolean {
+  return url === null || url.startsWith('https://');
+}
+
 // ============================================================================
 // DASHBOARD (Requires ADMIN+)
 // ============================================================================
@@ -91,6 +95,10 @@ export async function updateTenantBrandingAction(tenantSubdomain: string, data: 
  */
 export async function updateTenantLogoAction(tenantSubdomain: string, url: string | null) {
   try {
+    if (!isValidStorageUrl(url)) {
+      return { error: 'Invalid URL' };
+    }
+
     const { tenant } = await requireTenantAccess(tenantSubdomain, 'ADMIN');
 
     const current = await prisma.tenant.findUnique({
@@ -125,6 +133,10 @@ export async function updateTenantLogoAction(tenantSubdomain: string, url: strin
  */
 export async function updateTenantBannerAction(tenantSubdomain: string, url: string | null) {
   try {
+    if (!isValidStorageUrl(url)) {
+      return { error: 'Invalid URL' };
+    }
+
     const { tenant } = await requireTenantAccess(tenantSubdomain, 'ADMIN');
 
     const current = await prisma.tenant.findUnique({
@@ -159,6 +171,10 @@ export async function updateTenantBannerAction(tenantSubdomain: string, url: str
  */
 export async function addTenantImageAction(tenantSubdomain: string, url: string) {
   try {
+    if (!isValidStorageUrl(url)) {
+      return { error: 'Invalid URL' };
+    }
+
     const { tenant } = await requireTenantAccess(tenantSubdomain, 'ADMIN');
 
     const count = await prisma.tenantImage.count({ where: { tenantId: tenant.id } });

@@ -1,6 +1,5 @@
 import { getCurrentUser } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { unstable_noStore as noStore } from 'next/cache'
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Ticket } from 'lucide-react'
@@ -9,7 +8,6 @@ import { getMyTicketsAction } from '@/app/actions/orders'
 import { TicketsList } from '@/components/account'
 
 export default async function TicketsPage() {
-    noStore()
     const user = await getCurrentUser()
 
     if (!user) {

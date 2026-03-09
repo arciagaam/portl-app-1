@@ -7,6 +7,7 @@ import { PastEventsForm, type PastEvent } from './past-events-form';
 import { VenuesForm, type Venue } from './venues-form';
 import { ArtistsForm, type ArtistsTalent } from './artists-form';
 import { ReferencesForm, type Reference } from './references-form';
+import { uploadPendingFiles } from '@/lib/upload';
 
 export interface EventPortfolioData {
   pastEvents?: PastEvent[];
@@ -23,6 +24,36 @@ interface EventPortfolioFormProps {
 
 type PortfolioTab = 'past-events' | 'venues' | 'artists' | 'references';
 
+async function uploadPortfolioFiles(data: EventPortfolioData): Promise<EventPortfolioData> {
+  const uploaded = { ...data };
+
+  if (uploaded.pastEvents) {
+    uploaded.pastEvents = await Promise.all(
+      uploaded.pastEvents.map(async (event, i) => ({
+        ...event,
+        photos: await uploadPendingFiles(
+          event.photos as (string | File)[],
+          `portfolio/past-events/${i}`
+        ),
+      }))
+    );
+  }
+
+  if (uploaded.venues) {
+    uploaded.venues = await Promise.all(
+      uploaded.venues.map(async (venue, i) => ({
+        ...venue,
+        images: await uploadPendingFiles(
+          venue.images as (string | File)[],
+          `portfolio/venues/${i}`
+        ),
+      }))
+    );
+  }
+
+  return uploaded;
+}
+
 export function EventPortfolioForm({ initialData, onSave, onSaveAndExit }: EventPortfolioFormProps) {
   const [activeTab, setActiveTab] = useState<PortfolioTab>('past-events');
   const [isLoading, setIsLoading] = useState(false);
@@ -36,10 +67,11 @@ export function EventPortfolioForm({ initialData, onSave, onSaveAndExit }: Event
   const handleSave = async (shouldExit = false) => {
     setIsLoading(true);
     try {
+      const uploadedData = await uploadPortfolioFiles(portfolioData);
       if (shouldExit) {
-        await onSaveAndExit(portfolioData);
+        await onSaveAndExit(uploadedData);
       } else {
-        await onSave(portfolioData);
+        await onSave(uploadedData);
       }
     } finally {
       setIsLoading(false);

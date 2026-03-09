@@ -23,7 +23,7 @@ export default async function EventOrdersPage({
 
   const eventResult = await getEventByIdForTenantAction(subdomain, eventId);
 
-  if (eventResult.error || !eventResult.data) {
+  if ('error' in eventResult) {
     notFound();
   }
 
@@ -67,14 +67,14 @@ export default async function EventOrdersPage({
         }}
       />
 
-      {ordersResult.error ? (
+      {'error' in ordersResult ? (
         <div className="text-center py-10 text-muted-foreground">
           <p>{ordersResult.error}</p>
         </div>
       ) : (
         <OrdersSection
-          orders={ordersResult.data!.orders}
-          stats={ordersResult.data!.stats}
+          orders={ordersResult.data.orders}
+          stats={ordersResult.data.stats}
         />
       )}
     </div>

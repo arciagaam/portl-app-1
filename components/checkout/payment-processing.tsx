@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { verifyAndConfirmPaymentAction } from '@/app/actions/checkout';
+import { mainUrl } from '@/lib/url';
 
 interface PaymentProcessingProps {
   orderId: string;
@@ -58,8 +59,8 @@ export function PaymentProcessing({ orderId, tenantSubdomain }: PaymentProcessin
               <Button onClick={() => router.refresh()}>
                 Refresh Page
               </Button>
-              <Button variant="outline" onClick={() => router.push('/account/orders')}>
-                View My Orders
+              <Button variant="outline" asChild>
+                <a href={mainUrl('/account/orders')}>View My Orders</a>
               </Button>
             </div>
           </CardContent>

@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Ticket } from 'lucide-react';
@@ -87,11 +88,13 @@ export function TicketTypesDisplay({ eventId, ticketTypes }: TicketTypesDisplayP
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex gap-4">
                 {ticketType.imageUrl && (
-                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md">
-                    <img
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md">
+                    <Image
                       src={ticketType.imageUrl}
                       alt={ticketType.name}
-                      className="h-full w-full object-cover"
+                      fill
+                      sizes="64px"
+                      className="object-cover"
                     />
                   </div>
                 )}

@@ -22,6 +22,7 @@ import {
 } from '@/app/actions/tenant-events';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { uploadPendingFile } from '@/lib/upload';
 
 type EventWithImages = Event & {
   images: EventImage[];
@@ -37,24 +38,38 @@ const MAX_IMAGES = 10;
 export function GallerySection({ event, tenantSubdomain }: GallerySectionProps) {
   const router = useRouter();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [uploadedUrl, setUploadedUrl] = useState<string | undefined>();
+  const [pendingFile, setPendingFile] = useState<string | File | undefined>();
+  const [isAdding, setIsAdding] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState(false);
   const [isSettingThumbnail, setIsSettingThumbnail] = useState(false);
 
   const handleAddImage = useCallback(async () => {
-    if (!uploadedUrl) return;
+    if (!pendingFile) return;
 
-    const result = await addEventImageAction(tenantSubdomain, event.id, uploadedUrl);
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success('Image added to gallery');
-      setAddDialogOpen(false);
-      setUploadedUrl(undefined);
-      router.refresh();
+    setIsAdding(true);
+    try {
+      const url = await uploadPendingFile(pendingFile, `events/${event.id}/gallery`);
+      if (!url) {
+        toast.error('Upload failed');
+        return;
+      }
+
+      const result = await addEventImageAction(tenantSubdomain, event.id, url);
+      if ('error' in result) {
+        toast.error(result.error);
+      } else {
+        toast.success('Image added to gallery');
+        setAddDialogOpen(false);
+        setPendingFile(undefined);
+        router.refresh();
+      }
+    } catch {
+      toast.error('Failed to upload image');
+    } finally {
+      setIsAdding(false);
     }
-  }, [uploadedUrl, tenantSubdomain, event.id, router]);
+  }, [pendingFile, tenantSubdomain, event.id, router]);
 
   const handleDeleteImage = async (imageId: string) => {
     if (!confirm('Are you sure you want to delete this image?')) return;
@@ -63,7 +78,7 @@ export function GallerySection({ event, tenantSubdomain }: GallerySectionProps) 
     const result = await deleteEventImageAction(tenantSubdomain, imageId);
     setIsDeleting(null);
 
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       toast.success('Image removed');
@@ -90,7 +105,7 @@ export function GallerySection({ event, tenantSubdomain }: GallerySectionProps) 
     );
     setIsReordering(false);
 
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       router.refresh();
@@ -107,7 +122,7 @@ export function GallerySection({ event, tenantSubdomain }: GallerySectionProps) 
     );
     setIsSettingThumbnail(false);
 
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       toast.success(isCurrent ? 'Thumbnail cleared (will use first gallery image)' : 'Thumbnail set');
@@ -132,7 +147,7 @@ export function GallerySection({ event, tenantSubdomain }: GallerySectionProps) 
           open={addDialogOpen}
           onOpenChange={(open) => {
             setAddDialogOpen(open);
-            if (!open) setUploadedUrl(undefined);
+            if (!open) setPendingFile(undefined);
           }}
         >
           <DialogTrigger asChild>
@@ -150,22 +165,22 @@ export function GallerySection({ event, tenantSubdomain }: GallerySectionProps) 
             </DialogHeader>
             <div className="space-y-4">
               <FileUpload
-                value={uploadedUrl}
-                onChange={(url) => setUploadedUrl(url)}
-                folder={`events/${event.id}/gallery`}
+                value={pendingFile}
+                onChange={(val) => setPendingFile(val)}
               />
               <div className="flex justify-end gap-2">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setAddDialogOpen(false);
-                    setUploadedUrl(undefined);
+                    setPendingFile(undefined);
                   }}
+                  disabled={isAdding}
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleAddImage} disabled={!uploadedUrl}>
-                  Add to Gallery
+                <Button onClick={handleAddImage} disabled={!pendingFile || isAdding}>
+                  {isAdding ? 'Uploading...' : 'Add to Gallery'}
                 </Button>
               </div>
             </div>

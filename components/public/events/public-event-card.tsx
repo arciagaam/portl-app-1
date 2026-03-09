@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, MapPin, Clock, Ticket } from 'lucide-react';
 import type { Event, TicketType } from '@/prisma/generated/prisma/client';
@@ -39,11 +40,13 @@ export function PublicEventCard({ event, tenantSubdomain }: PublicEventCardProps
     <Link href={`/events/${event.id}`}>
       <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer group overflow-hidden">
         {thumbnailUrl && (
-          <div className="aspect-[16/9] overflow-hidden">
-            <img
+          <div className="relative aspect-[16/9] overflow-hidden">
+            <Image
               src={thumbnailUrl}
               alt={event.name}
-              className="h-full w-full object-cover transition-transform group-hover:scale-105"
+              fill
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              className="object-cover transition-transform group-hover:scale-105"
             />
           </div>
         )}

@@ -5,25 +5,30 @@ import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/admin'
 
 /**
- * Get all users with tenant counts and order counts
+ * Get users with tenant counts and order counts (paginated)
  */
-export async function getAllUsersAction() {
+export async function getAllUsersAction(page = 1, pageSize = 50) {
   try {
     await requireAdmin()
 
-    const users = await prisma.user.findMany({
-      include: {
-        tenants: {
-          select: { id: true, subdomain: true, name: true, status: true },
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        include: {
+          tenants: {
+            select: { id: true, subdomain: true, name: true, status: true },
+          },
+          _count: {
+            select: { orders: true, ownedTickets: true },
+          },
         },
-        _count: {
-          select: { orders: true, ownedTickets: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.user.count(),
+    ])
 
-    return { data: users }
+    return { data: users, total, page, pageSize }
   } catch (error) {
     console.error('Error fetching users:', error)
     return { error: 'Failed to fetch users' }

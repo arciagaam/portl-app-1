@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import { notFound } from 'next/navigation'
-import { getCurrentTenant } from '@/lib/tenant'
+import { getActiveTenantBySubdomain } from '@/lib/tenant'
 import { TenantNavbar } from '@/components/layout/tenant-navbar'
+import { CartProvider, CartDrawer } from '@/components/cart'
 
 type TenantWithNavbarLayoutProps = {
     children: ReactNode
@@ -13,7 +14,7 @@ export default async function TenantWithNavbarLayout({
     params,
 }: TenantWithNavbarLayoutProps) {
     const { tenant: subdomain } = await params
-    const tenant = await getCurrentTenant(subdomain)
+    const tenant = await getActiveTenantBySubdomain(subdomain)
 
     if (!tenant) {
         notFound()
@@ -21,14 +22,17 @@ export default async function TenantWithNavbarLayout({
 
     return (
         <div className="dark">
-            <TenantNavbar
-                tenantSubdomain={subdomain}
-                tenantName={tenant.name}
-                tenantLogoUrl={tenant.logoUrl ?? undefined}
-            />
-            <main className="pt-16">
-                {children}
-            </main>
+            <CartProvider>
+                <TenantNavbar
+                    tenantSubdomain={subdomain}
+                    tenantName={tenant.name}
+                    tenantLogoUrl={tenant.logoUrl ?? undefined}
+                />
+                <main className="pt-16">
+                    {children}
+                </main>
+                <CartDrawer />
+            </CartProvider>
         </div>
     )
 }

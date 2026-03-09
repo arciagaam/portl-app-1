@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ClipboardList, Users, TrendingUp, ChevronDown, ChevronRight } from 'lucide-react';
+import { formatPhp } from '@/lib/format';
 
 interface OrderTicket {
   id: string;
@@ -53,9 +54,6 @@ interface OrdersSectionProps {
 export function OrdersSection({ orders, stats }: OrdersSectionProps) {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount / 100);
-
   const formatDate = (date: Date | string | null) => {
     if (!date) return '-';
     return new Date(date).toLocaleDateString('en-US', {
@@ -95,7 +93,7 @@ export function OrdersSection({ orders, stats }: OrdersSectionProps) {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</div>
+            <div className="text-2xl font-bold">{formatPhp(stats.totalRevenue)}</div>
           </CardContent>
         </Card>
       </div>
@@ -136,7 +134,6 @@ export function OrdersSection({ orders, stats }: OrdersSectionProps) {
                         onToggle={() =>
                           setExpandedOrderId(isExpanded ? null : order.id)
                         }
-                        formatCurrency={formatCurrency}
                         formatDate={formatDate}
                       />
                     );
@@ -156,14 +153,12 @@ function OrderRow({
   ticketCount,
   isExpanded,
   onToggle,
-  formatCurrency,
   formatDate,
 }: {
   order: OrdersSectionProps['orders'][number];
   ticketCount: number;
   isExpanded: boolean;
   onToggle: () => void;
-  formatCurrency: (amount: number) => string;
   formatDate: (date: Date | string | null) => string;
 }) {
   const purchaserName = [order.user.firstName, order.user.lastName]
@@ -191,7 +186,7 @@ function OrderRow({
           )}
         </td>
         <td className="py-3 px-2">{ticketCount}</td>
-        <td className="py-3 px-2">{formatCurrency(order.total)}</td>
+        <td className="py-3 px-2">{formatPhp(order.total)}</td>
         <td className="py-3 px-2 text-muted-foreground">
           {formatDate(order.completedAt || order.createdAt)}
         </td>

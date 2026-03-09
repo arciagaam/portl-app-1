@@ -12,7 +12,7 @@ import { Plus, Trash2 } from 'lucide-react';
 export interface PastEvent {
   name: string;
   date: string;
-  photos: string[]; // URLs - max 10
+  photos: (string | File)[]; // URLs or pending Files - max 10
   videoLinks: string[]; // max 10
   estimatedAttendance?: string;
   pressCoverage?: string; // Media mentions
@@ -30,7 +30,7 @@ export function PastEventsForm({ initialData, onChange }: PastEventsFormProps) {
       : [{ name: '', date: '', photos: [], videoLinks: [], estimatedAttendance: '', pressCoverage: '' }]
   );
 
-  const updateEvent = (index: number, field: keyof PastEvent, value: string | string[]) => {
+  const updateEvent = (index: number, field: keyof PastEvent, value: string | (string | File)[]) => {
     const newEvents = [...events];
     newEvents[index] = { ...newEvents[index], [field]: value };
     setEvents(newEvents);
@@ -51,18 +51,18 @@ export function PastEventsForm({ initialData, onChange }: PastEventsFormProps) {
     onChange(newEvents);
   };
 
-  const handlePhotoUploaded = (eventIndex: number, url: string) => {
+  const handlePhotoAdded = (eventIndex: number, val: string | File) => {
     const event = events[eventIndex];
     if (event.photos.length >= 10) return;
-    const newPhotos = [...event.photos, url];
+    const newPhotos = [...event.photos, val];
     updateEvent(eventIndex, 'photos', newPhotos);
   };
 
-  const handlePhotoReplaced = (eventIndex: number, photoIndex: number, url: string | undefined) => {
+  const handlePhotoChanged = (eventIndex: number, photoIndex: number, val: string | File | undefined) => {
     const event = events[eventIndex];
     const newPhotos = [...event.photos];
-    if (url) {
-      newPhotos[photoIndex] = url;
+    if (val) {
+      newPhotos[photoIndex] = val;
     } else {
       newPhotos.splice(photoIndex, 1);
     }
@@ -127,23 +127,21 @@ export function PastEventsForm({ initialData, onChange }: PastEventsFormProps) {
                   <FileUpload
                     key={`${eventIndex}-photo-${photoIndex}`}
                     value={photo}
-                    onChange={(url) => handlePhotoReplaced(eventIndex, photoIndex, url)}
-                    folder={`portfolio/past-events/${eventIndex}`}
+                    onChange={(val) => handlePhotoChanged(eventIndex, photoIndex, val)}
                   />
                 ))}
                 {event.photos.length < 10 && (
                   <FileUpload
                     key={`${eventIndex}-photo-new-${event.photos.length}`}
                     value={undefined}
-                    onChange={(url) => {
-                      if (url) handlePhotoUploaded(eventIndex, url);
+                    onChange={(val) => {
+                      if (val) handlePhotoAdded(eventIndex, val);
                     }}
-                    folder={`portfolio/past-events/${eventIndex}`}
                   />
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {event.photos.length}/10 photos uploaded
+                {event.photos.length}/10 photos
               </p>
             </div>
 

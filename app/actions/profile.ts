@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import bcrypt from 'bcryptjs';
-import prisma from '@/prisma/client';
+import { prisma } from '@/lib/prisma';
 import { getCurrentUser } from '@/lib/auth';
+import { updateProfileSchema, updatePasswordSchema } from '@/lib/validations/profile';
 
 export async function updateProfileAction(formData: FormData) {
   const user = await getCurrentUser();
@@ -12,14 +13,19 @@ export async function updateProfileAction(formData: FormData) {
     return { error: 'You must be logged in to update your profile' };
   }
 
-  const firstName = formData.get('firstName') as string;
-  const lastName = formData.get('lastName') as string;
-  const email = formData.get('email') as string;
-  const image = formData.get('image') as string | null;
+  const raw = {
+    firstName: formData.get('firstName'),
+    lastName: formData.get('lastName'),
+    email: formData.get('email'),
+    image: formData.get('image') as string | null,
+  };
 
-  if (!firstName || !lastName || !email) {
-    return { error: 'First name, last name, and email are required' };
+  const parsed = updateProfileSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
   }
+
+  const { firstName, lastName, email, image } = parsed.data;
 
   // Check if email is taken by another user
   if (email !== user.email) {
@@ -39,7 +45,7 @@ export async function updateProfileAction(formData: FormData) {
         firstName,
         lastName,
         email,
-        ...(image !== null && { image: image || null }),
+        ...(image !== undefined && { image: image || null }),
       },
     });
 
@@ -59,21 +65,18 @@ export async function updatePasswordAction(formData: FormData) {
     return { error: 'You must be logged in to update your password' };
   }
 
-  const currentPassword = formData.get('currentPassword') as string;
-  const newPassword = formData.get('newPassword') as string;
-  const confirmPassword = formData.get('confirmPassword') as string;
+  const raw = {
+    currentPassword: formData.get('currentPassword'),
+    newPassword: formData.get('newPassword'),
+    confirmPassword: formData.get('confirmPassword'),
+  };
 
-  if (!currentPassword || !newPassword || !confirmPassword) {
-    return { error: 'All fields are required' };
+  const parsed = updatePasswordSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
   }
 
-  if (newPassword !== confirmPassword) {
-    return { error: 'New passwords do not match' };
-  }
-
-  if (newPassword.length < 8) {
-    return { error: 'Password must be at least 8 characters' };
-  }
+  const { currentPassword, newPassword } = parsed.data;
 
   // Get user with password
   const dbUser = await prisma.user.findUnique({

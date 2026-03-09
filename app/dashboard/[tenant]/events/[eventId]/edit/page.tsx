@@ -20,7 +20,7 @@ export default async function EditEventPage({
 
   const result = await getEventByIdForTenantAction(subdomain, eventId);
 
-  if (result.error || !result.data) {
+  if ('error' in result) {
     notFound();
   }
 

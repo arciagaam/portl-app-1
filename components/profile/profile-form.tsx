@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FileUpload } from '@/components/ui/file-upload';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { uploadPendingFile } from '@/lib/upload';
 
 const profileSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -25,7 +26,7 @@ interface ProfileFormProps {
 export function ProfileForm({ defaultValues }: ProfileFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | undefined>(defaultValues.imageUrl);
+  const [imageFile, setImageFile] = useState<string | File | undefined>(defaultValues.imageUrl);
   const [imageChanged, setImageChanged] = useState(false);
 
   const {
@@ -41,13 +42,24 @@ export function ProfileForm({ defaultValues }: ProfileFormProps) {
     setIsLoading(true);
     setMessage(null);
 
+    let uploadedImageUrl: string | undefined;
+    if (imageChanged) {
+      try {
+        uploadedImageUrl = await uploadPendingFile(imageFile, 'avatars');
+      } catch {
+        setIsLoading(false);
+        setMessage({ type: 'error', text: 'Failed to upload image. Please try again.' });
+        return;
+      }
+    }
+
     const formData = new FormData();
     formData.append('firstName', data.firstName);
     formData.append('lastName', data.lastName);
     formData.append('email', data.email);
 
     if (imageChanged) {
-      formData.append('image', imageUrl || '');
+      formData.append('image', uploadedImageUrl || '');
     }
 
     const result = await updateProfileAction(formData);
@@ -62,8 +74,8 @@ export function ProfileForm({ defaultValues }: ProfileFormProps) {
     }
   };
 
-  const handleImageChange = (url: string | undefined) => {
-    setImageUrl(url);
+  const handleImageChange = (val: string | File | undefined) => {
+    setImageFile(val);
     setImageChanged(true);
   };
 
@@ -90,8 +102,7 @@ export function ProfileForm({ defaultValues }: ProfileFormProps) {
 
       <FileUpload
         label="Profile Photo"
-        folder="avatars"
-        value={imageUrl}
+        value={imageFile}
         onChange={handleImageChange}
       />
 

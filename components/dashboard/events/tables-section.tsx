@@ -26,6 +26,7 @@ import {
 } from '@/app/actions/tenant-events';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { formatPhp } from '@/lib/format';
 import type { TableFormData } from '@/lib/validations/events';
 
 type EventWithTables = Event & Prisma.EventGetPayload<{
@@ -58,7 +59,7 @@ export function TablesSection({ event, tenantSubdomain }: TablesSectionProps) {
 
   const handleCreateTable = async (data: TableFormData) => {
     const result = await createTableForTenantAction(tenantSubdomain, event.id, data);
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       toast.success('Table created successfully');
@@ -70,7 +71,7 @@ export function TablesSection({ event, tenantSubdomain }: TablesSectionProps) {
   const handleUpdateTable = async (data: TableFormData) => {
     if (!editingTable) return;
     const result = await updateTableForTenantAction(tenantSubdomain, editingTable.id, data);
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       toast.success('Table updated successfully');
@@ -81,7 +82,7 @@ export function TablesSection({ event, tenantSubdomain }: TablesSectionProps) {
 
   const handleBulkCreate = async (data: Parameters<typeof bulkCreateTablesForTenantAction>[2]) => {
     const result = await bulkCreateTablesForTenantAction(tenantSubdomain, event.id, data);
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
       return { error: result.error };
     } else {
@@ -99,7 +100,7 @@ export function TablesSection({ event, tenantSubdomain }: TablesSectionProps) {
     setIsDeleting(tableId);
     const result = await deleteTableForTenantAction(tenantSubdomain, tableId);
     setIsDeleting(null);
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       toast.success('Table deleted successfully');
@@ -111,20 +112,12 @@ export function TablesSection({ event, tenantSubdomain }: TablesSectionProps) {
     setIsRegenerating(tableId);
     const result = await regenerateSeatsForTenantAction(tenantSubdomain, tableId);
     setIsRegenerating(null);
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       toast.success('Seats regenerated successfully');
       router.refresh();
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-      minimumFractionDigits: 0,
-    }).format(amount);
   };
 
   return (
@@ -235,7 +228,7 @@ export function TablesSection({ event, tenantSubdomain }: TablesSectionProps) {
                     <TableCell>{table.capacity}</TableCell>
                     <TableCell>{table.seats.length} seats</TableCell>
                     <TableCell>
-                      {table.minSpend ? formatCurrency(table.minSpend) : '—'}
+                      {table.minSpend ? formatPhp(table.minSpend) : '—'}
                     </TableCell>
                     <TableCell>{table._count.ticketTypes}</TableCell>
                     <TableCell>

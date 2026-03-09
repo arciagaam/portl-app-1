@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Ticket, Users, DollarSign, TableIcon } from 'lucide-react';
 import { Event, Prisma } from '@/prisma/generated/prisma/client';
+import { formatPhp } from '@/lib/format';
 
 type EventWithRelations = Event & Prisma.EventGetPayload<{
   include: {
@@ -41,15 +42,6 @@ export function EventStatsCards({ event }: EventStatsCardsProps) {
   const currentRevenue = event.ticketTypes.reduce((acc, tt) => {
     return acc + (tt.basePrice * tt.quantitySold);
   }, 0);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -100,9 +92,9 @@ export function EventStatsCards({ event }: EventStatsCardsProps) {
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatCurrency(currentRevenue)}</div>
+          <div className="text-2xl font-bold">{formatPhp(currentRevenue)}</div>
           <p className="text-xs text-muted-foreground">
-            {potentialRevenue > 0 ? `${formatCurrency(potentialRevenue)} potential` : 'Set ticket prices'}
+            {potentialRevenue > 0 ? `${formatPhp(potentialRevenue)} potential` : 'Set ticket prices'}
           </p>
         </CardContent>
       </Card>

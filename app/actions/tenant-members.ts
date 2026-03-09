@@ -109,7 +109,7 @@ export async function inviteTeamMemberAction(
         status: 'PENDING',
         invitedBy: user.id,
         expiresAt,
-        token: undefined, // Generate new token
+        token: crypto.randomUUID(),
       },
       create: {
         tenantId: tenant.id,
@@ -121,8 +121,14 @@ export async function inviteTeamMemberAction(
       },
     });
 
-    // Send invitation email
-    const inviterName = user.name || user.email || 'A team member';
+    // Fetch fresh user data for the inviter name (JWT may have stale name)
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { firstName: true, lastName: true, email: true },
+    });
+    const inviterName = dbUser
+      ? ([dbUser.firstName, dbUser.lastName].filter(Boolean).join(' ') || dbUser.email || 'A team member')
+      : (user.email || 'A team member');
     const inviteUrl = mainUrl(`/invite/${invitation.token}`);
 
     await sendInvitationEmail({
@@ -176,7 +182,7 @@ export async function updateTeamMemberAction(
       }
     }
 
-    const updateData: any = {};
+    const updateData: Partial<{ role: TenantMemberRole; title: string | null; tenantShowInProfile: boolean }> = {};
     if (parsed.data.role) updateData.role = parsed.data.role;
     if (parsed.data.title !== undefined) updateData.title = parsed.data.title;
     if (parsed.data.tenantShowInProfile !== undefined) {
@@ -224,8 +230,8 @@ export async function removeTeamMemberAction(
       return { error: 'Cannot remove the owner' };
     }
 
-    // ADMIN can only remove MANAGER and MEMBER
-    if (membership.role === 'ADMIN' && !hasMinimumRole(membership.role, target.role)) {
+    // ADMIN can only remove MANAGER and MEMBER (not other ADMINs)
+    if (membership.role === 'ADMIN' && hasMinimumRole(target.role, 'ADMIN')) {
       return { error: 'Insufficient permissions to remove this member' };
     }
 

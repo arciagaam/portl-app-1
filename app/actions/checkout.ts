@@ -3,80 +3,56 @@
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import type { SaveAttendeesData, CompleteCheckoutData, VoucherCodeApplyData, CreatePaymentSessionData } from '@/lib/validations/checkout';
-import type { Order, OrderItem, Ticket, Event, TicketType, Tenant, Promotion, VoucherCode, Prisma } from '@/prisma/generated/prisma/client';
+import {
+  voucherCodeApplySchema,
+  saveAttendeesSchema,
+  createPaymentSessionSchema,
+  cancelOrderSchema,
+  completeCheckoutWithAttendeesSchema,
+} from '@/lib/validations/checkout';
+import type { SaveAttendeesData, VoucherCodeApplyData, CreatePaymentSessionData, CompleteCheckoutWithAttendeesData } from '@/lib/validations/checkout';
+import type { Ticket, Prisma, Promotion } from '@/prisma/generated/prisma/client';
 import { nanoid } from 'nanoid';
 import { createCheckoutSession, retrieveCheckoutSession } from '@/lib/paymongo';
-import { tenantUrl, mainUrl } from '@/lib/url';
-import { sendOrderConfirmationEmail } from '@/lib/email';
+import { tenantUrl } from '@/lib/url';
+import {
+  generateTicketsForOrder,
+  sendConfirmationEmailForOrder,
+  cleanupExpiredOrders,
+  confirmOrderFromPayment,
+} from '@/lib/checkout-internal';
+import type { CheckoutOrderWithRelations } from '@/lib/types/order';
 
-// Order expiration time in minutes
+type OrderWithRelations = CheckoutOrderWithRelations;
+
+// Order lifecycle:
+// 1. Order created → expiresAt = now + 15 min (ORDER_EXPIRATION_MINUTES)
+// 2. Payment session created → expiresAt extended to now + 30 min (PAYMENT_SESSION_EXPIRATION_MINUTES)
+// 3. Payment confirmed → expiresAt cleared (null)
+// 4. Cron (every 5 min) and opportunistic cleanup cancel orders past expiresAt
 const ORDER_EXPIRATION_MINUTES = 15;
 
-/**
- * Fire-and-forget order confirmation email
- */
-async function sendConfirmationEmailForOrder(orderId: string): Promise<void> {
-  try {
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        event: true,
-        user: { select: { email: true } },
-        tickets: true,
+const ORDER_WITH_RELATIONS_INCLUDE = {
+  event: true,
+  tenant: true,
+  items: {
+    include: {
+      ticketType: true,
+      tickets: {
+        include: {
+          ticketType: true,
+        },
       },
-    });
-
-    if (!order) return;
-
-    const email = order.contactEmail || order.user.email;
-    if (!email) return;
-
-    const eventDate = new Date(order.event.startDate).toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-
-    const total = order.total === 0
-      ? 'FREE'
-      : new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(order.total / 100);
-
-    await sendOrderConfirmationEmail({
-      to: email,
-      orderNumber: order.orderNumber,
-      eventName: order.event.name,
-      eventDate,
-      venueName: order.event.venueName,
-      ticketCount: order.tickets.length,
-      total,
-      ticketsUrl: mainUrl('/account/tickets'),
-    });
-  } catch (error) {
-    // Fire-and-forget: don't fail the order if email fails
-    console.error('Failed to send order confirmation email:', error);
-  }
-}
-
-// Types for order with relations
-export type OrderItemWithRelations = OrderItem & {
-  ticketType: TicketType;
-  tickets: Ticket[];
-};
-
-export type TicketWithTicketType = Ticket & {
-  ticketType: TicketType;
-};
-
-export type OrderWithRelations = Order & {
-  event: Event;
-  tenant: Tenant;
-  items: OrderItemWithRelations[];
-  tickets: TicketWithTicketType[];
-  promotion: Promotion | null;
-  voucherCode: VoucherCode | null;
-};
+    },
+  },
+  tickets: {
+    include: {
+      ticketType: true,
+    },
+  },
+  promotion: true,
+  voucherCode: true,
+} as const satisfies Prisma.OrderInclude;
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -87,13 +63,6 @@ export type OrderWithRelations = Order & {
  */
 function generateOrderNumber(): string {
   return `PORTL-${nanoid(8).toUpperCase()}`;
-}
-
-/**
- * Generate a unique ticket code
- */
-function generateTicketCode(): string {
-  return `TKT-${nanoid(4).toUpperCase()}-${nanoid(4).toUpperCase()}`;
 }
 
 /**
@@ -297,27 +266,7 @@ export async function initializeCheckoutAction(
     // Fetch complete order with relations
     const completeOrder = await prisma.order.findUnique({
       where: { id: order.id },
-      include: {
-        event: true,
-        tenant: true,
-        items: {
-          include: {
-            ticketType: true,
-            tickets: {
-          include: {
-            ticketType: true,
-          },
-        },
-          },
-        },
-        tickets: {
-          include: {
-            ticketType: true,
-          },
-        },
-        promotion: true,
-        voucherCode: true,
-      },
+      include: ORDER_WITH_RELATIONS_INCLUDE,
     });
 
     revalidatePath(`/t/${tenantSubdomain}/checkout`);
@@ -345,6 +294,16 @@ export async function applyVoucherCodeAction(
   data: VoucherCodeApplyData
 ): Promise<{ data: OrderWithRelations } | { error: string }> {
   try {
+    const parsedOrderId = cancelOrderSchema.safeParse({ orderId });
+    if (!parsedOrderId.success) {
+      return { error: parsedOrderId.error.issues[0]?.message || 'Invalid order ID' };
+    }
+
+    const parsed = voucherCodeApplySchema.safeParse(data);
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message || 'Invalid input' };
+    }
+
     const session = await requireAuth();
     const userId = session.user.id;
 
@@ -392,7 +351,7 @@ export async function applyVoucherCodeAction(
 
     // Check if promotion is for this event
     if (promotion.eventId !== order.eventId) {
-      return { error: 'This code is not valid for this event' };
+      return { error: 'Invalid voucher code' };
     }
 
     // Check validity dates
@@ -454,27 +413,7 @@ export async function applyVoucherCodeAction(
         discountAmount,
         total: Math.max(0, order.subtotal - discountAmount + order.serviceFee),
       },
-      include: {
-        event: true,
-        tenant: true,
-        items: {
-          include: {
-            ticketType: true,
-            tickets: {
-          include: {
-            ticketType: true,
-          },
-        },
-          },
-        },
-        tickets: {
-          include: {
-            ticketType: true,
-          },
-        },
-        promotion: true,
-        voucherCode: true,
-      },
+      include: ORDER_WITH_RELATIONS_INCLUDE,
     });
 
     return { data: updatedOrder as OrderWithRelations };
@@ -494,12 +433,17 @@ export async function removeVoucherCodeAction(
   orderId: string
 ): Promise<{ data: OrderWithRelations } | { error: string }> {
   try {
+    const parsed = cancelOrderSchema.safeParse({ orderId });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message || 'Invalid order ID' };
+    }
+
     const session = await requireAuth();
     const userId = session.user.id;
 
     // Find order and verify ownership
     const order = await prisma.order.findUnique({
-      where: { id: orderId },
+      where: { id: parsed.data.orderId },
     });
 
     if (!order) {
@@ -523,27 +467,7 @@ export async function removeVoucherCodeAction(
         discountAmount: 0,
         total: order.subtotal + order.serviceFee,
       },
-      include: {
-        event: true,
-        tenant: true,
-        items: {
-          include: {
-            ticketType: true,
-            tickets: {
-          include: {
-            ticketType: true,
-          },
-        },
-          },
-        },
-        tickets: {
-          include: {
-            ticketType: true,
-          },
-        },
-        promotion: true,
-        voucherCode: true,
-      },
+      include: ORDER_WITH_RELATIONS_INCLUDE,
     });
 
     return { data: updatedOrder as OrderWithRelations };
@@ -563,10 +487,15 @@ export async function saveAttendeesAction(
   data: SaveAttendeesData
 ): Promise<{ data: OrderWithRelations } | { error: string }> {
   try {
+    const parsed = saveAttendeesSchema.safeParse(data);
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message || 'Invalid input' };
+    }
+
     const session = await requireAuth();
     const userId = session.user.id;
 
-    const { orderId, attendees } = data;
+    const { orderId, attendees } = parsed.data;
 
     // Find order and verify ownership
     const order = await prisma.order.findUnique({
@@ -601,27 +530,7 @@ export async function saveAttendeesAction(
       data: {
         metadata: { attendees },
       },
-      include: {
-        event: true,
-        tenant: true,
-        items: {
-          include: {
-            ticketType: true,
-            tickets: {
-          include: {
-            ticketType: true,
-          },
-        },
-          },
-        },
-        tickets: {
-          include: {
-            ticketType: true,
-          },
-        },
-        promotion: true,
-        voucherCode: true,
-      },
+      include: ORDER_WITH_RELATIONS_INCLUDE,
     });
 
     // Store attendee data in a way we can retrieve it
@@ -642,13 +551,18 @@ export async function saveAttendeesAction(
  * Complete checkout (placeholder payment) and generate tickets
  */
 export async function completeCheckoutAction(
-  data: CompleteCheckoutData & { attendees?: Array<{ firstName: string; lastName: string; email: string; phone?: string | null }> }
+  data: CompleteCheckoutWithAttendeesData
 ): Promise<{ data: { order: OrderWithRelations; tickets: Ticket[] } } | { error: string }> {
   try {
+    const parsed = completeCheckoutWithAttendeesSchema.safeParse(data);
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message || 'Invalid input' };
+    }
+
     const session = await requireAuth();
     const userId = session.user.id;
 
-    const { orderId, contactEmail, contactPhone, attendees } = data;
+    const { orderId, contactEmail, contactPhone, attendees } = parsed.data;
 
     // Find order and verify ownership
     const order = await prisma.order.findUnique({
@@ -719,34 +633,7 @@ export async function completeCheckoutAction(
       }
 
       // Generate tickets
-      const tickets: Ticket[] = [];
-      let attendeeIndex = 0;
-
-      for (const item of order.items) {
-        for (let i = 0; i < item.quantity; i++) {
-          const attendee = attendees?.[attendeeIndex];
-
-          const ticket = await tx.ticket.create({
-            data: {
-              ticketCode: generateTicketCode(),
-              orderId,
-              orderItemId: item.id,
-              eventId: order.eventId,
-              ticketTypeId: item.ticketTypeId,
-              seatId: item.seatId,
-              ownerId: userId,
-              holderFirstName: attendee?.firstName || null,
-              holderLastName: attendee?.lastName || null,
-              holderEmail: attendee?.email || null,
-              holderPhone: attendee?.phone || null,
-              status: 'ACTIVE',
-            },
-          });
-
-          tickets.push(ticket);
-          attendeeIndex++;
-        }
-      }
+      const tickets = await generateTicketsForOrder(tx, order, attendees || [], userId);
 
       return { order: updatedOrder, tickets };
     });
@@ -754,27 +641,7 @@ export async function completeCheckoutAction(
     // Fetch complete order with all relations
     const completeOrder = await prisma.order.findUnique({
       where: { id: orderId },
-      include: {
-        event: true,
-        tenant: true,
-        items: {
-          include: {
-            ticketType: true,
-            tickets: {
-          include: {
-            ticketType: true,
-          },
-        },
-          },
-        },
-        tickets: {
-          include: {
-            ticketType: true,
-          },
-        },
-        promotion: true,
-        voucherCode: true,
-      },
+      include: ORDER_WITH_RELATIONS_INCLUDE,
     });
 
     revalidatePath('/account/orders');
@@ -799,82 +666,21 @@ export async function completeCheckoutAction(
 const PAYMENT_SESSION_EXPIRATION_MINUTES = 30;
 
 /**
- * Cancel an expired pending order and release inventory (internal, no auth check).
- * Used to clean up abandoned orders so tickets become available again.
- */
-async function cancelExpiredOrder(orderId: string): Promise<void> {
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: { items: true },
-  });
-
-  if (!order || order.status !== 'PENDING') return;
-
-  await prisma.$transaction(async (tx) => {
-    for (const item of order.items) {
-      await tx.ticketType.update({
-        where: { id: item.ticketTypeId },
-        data: { quantitySold: { decrement: item.quantity } },
-      });
-
-      if (item.priceTierId) {
-        await tx.ticketTypePriceTier.update({
-          where: { id: item.priceTierId },
-          data: { allocationSold: { decrement: item.quantity } },
-        });
-      }
-    }
-
-    await tx.order.update({
-      where: { id: orderId },
-      data: {
-        status: 'CANCELLED',
-        cancelledAt: new Date(),
-        expiresAt: null,
-      },
-    });
-
-    await tx.ticket.updateMany({
-      where: { orderId },
-      data: { status: 'CANCELLED' },
-    });
-  });
-}
-
-/**
- * Find and cancel all expired PENDING orders for a user+tenant to release inventory.
- */
-async function cleanupExpiredOrders(userId: string, tenantId: string): Promise<void> {
-  const expiredOrders = await prisma.order.findMany({
-    where: {
-      userId,
-      tenantId,
-      status: 'PENDING',
-      expiresAt: { lt: new Date() },
-    },
-    select: { id: true },
-  });
-
-  for (const order of expiredOrders) {
-    try {
-      await cancelExpiredOrder(order.id);
-    } catch (error) {
-      console.error(`Failed to cancel expired order ${order.id}:`, error);
-    }
-  }
-}
-
-/**
  * Confirm a free order (total = 0) without payment gateway
  */
 export async function confirmFreeOrderAction(
   data: CreatePaymentSessionData
 ): Promise<{ data: { orderId: string } } | { error: string }> {
   try {
+    const parsed = createPaymentSessionSchema.safeParse(data);
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message || 'Invalid input' };
+    }
+
     const session = await requireAuth();
     const userId = session.user.id;
 
-    const { orderId, contactEmail, contactPhone, attendees } = data;
+    const { orderId, contactEmail, contactPhone, attendees } = parsed.data;
 
     const order = await prisma.order.findUnique({
       where: { id: orderId },
@@ -931,29 +737,7 @@ export async function confirmFreeOrderAction(
       }
 
       // Generate tickets
-      let attendeeIndex = 0;
-      for (const item of order.items) {
-        for (let i = 0; i < item.quantity; i++) {
-          const attendee = attendees?.[attendeeIndex];
-          await tx.ticket.create({
-            data: {
-              ticketCode: generateTicketCode(),
-              orderId,
-              orderItemId: item.id,
-              eventId: order.eventId,
-              ticketTypeId: item.ticketTypeId,
-              seatId: item.seatId,
-              ownerId: userId,
-              holderFirstName: attendee?.firstName || null,
-              holderLastName: attendee?.lastName || null,
-              holderEmail: attendee?.email || null,
-              holderPhone: attendee?.phone || null,
-              status: 'ACTIVE',
-            },
-          });
-          attendeeIndex++;
-        }
-      }
+      await generateTicketsForOrder(tx, order, attendees || [], userId);
     });
 
     revalidatePath('/account/orders');
@@ -979,10 +763,15 @@ export async function createPaymentSessionAction(
   data: CreatePaymentSessionData
 ): Promise<{ data: { checkoutUrl: string } } | { error: string }> {
   try {
+    const parsed = createPaymentSessionSchema.safeParse(data);
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message || 'Invalid input' };
+    }
+
     const session = await requireAuth();
     const userId = session.user.id;
 
-    const { orderId, contactEmail, contactPhone, attendees } = data;
+    const { orderId, contactEmail, contactPhone, attendees } = parsed.data;
 
     // Find order with relations
     const order = await prisma.order.findUnique({
@@ -1059,11 +848,11 @@ export async function createPaymentSessionAction(
 
     const checkoutResult = await createCheckoutSession({
       lineItems: finalLineItems,
-      paymentMethodTypes: ['qrph', 'gcash', 'paymaya'],
+      paymentMethodTypes: ['qrph'],
       description: `Order ${order.orderNumber} - ${order.event.name}`,
       referenceNumber: order.orderNumber,
       successUrl: tenantUrl(subdomain, `/checkout/success/${orderId}`),
-      cancelUrl: tenantUrl(subdomain, '/checkout?resume=true'),
+      cancelUrl: tenantUrl(subdomain, '/checkout?resume=true&payment_cancelled=true'),
       sendEmailReceipt: true,
       metadata: {
         orderId: order.id,
@@ -1106,125 +895,22 @@ export async function createPaymentSessionAction(
 }
 
 /**
- * Confirm order after payment (called from webhook or success page fallback).
- * This is an internal function, not a server action.
- */
-export async function confirmOrderFromPayment(
-  orderId: string,
-  paymentData: {
-    paymentId: string;
-    amount: number;
-    status: string;
-    paidAt?: number;
-  }
-): Promise<void> {
-  const order = await prisma.order.findUnique({
-    where: { id: orderId },
-    include: {
-      items: {
-        include: {
-          ticketType: true,
-        },
-      },
-      voucherCode: true,
-    },
-  });
-
-  if (!order || order.status !== 'PENDING') {
-    // Already confirmed or cancelled - idempotent
-    return;
-  }
-
-  // Read attendees from order metadata
-  const metadata = order.metadata as { attendees?: Array<{ firstName: string; lastName: string; email: string; phone?: string | null }> } | null;
-  const attendees = metadata?.attendees || [];
-
-  await prisma.$transaction(async (tx) => {
-    // Update transaction record
-    await tx.transaction.updateMany({
-      where: {
-        orderId,
-        provider: 'paymongo',
-        status: 'PENDING',
-      },
-      data: {
-        status: 'COMPLETED',
-        providerTxnId: paymentData.paymentId,
-        providerStatus: paymentData.status,
-        metadata: paymentData as unknown as Prisma.InputJsonValue,
-        processedAt: paymentData.paidAt
-          ? new Date(paymentData.paidAt * 1000)
-          : new Date(),
-      },
-    });
-
-    // Update order status
-    await tx.order.update({
-      where: { id: orderId },
-      data: {
-        status: 'CONFIRMED',
-        completedAt: new Date(),
-        expiresAt: null,
-      },
-    });
-
-    // Increment voucher redemption count if used
-    if (order.voucherCodeId) {
-      await tx.voucherCode.update({
-        where: { id: order.voucherCodeId },
-        data: {
-          redeemedCount: { increment: 1 },
-        },
-      });
-    }
-
-    // Generate tickets
-    let attendeeIndex = 0;
-    for (const item of order.items) {
-      for (let i = 0; i < item.quantity; i++) {
-        const attendee = attendees[attendeeIndex];
-
-        await tx.ticket.create({
-          data: {
-            ticketCode: generateTicketCode(),
-            orderId,
-            orderItemId: item.id,
-            eventId: order.eventId,
-            ticketTypeId: item.ticketTypeId,
-            seatId: item.seatId,
-            ownerId: order.userId,
-            holderFirstName: attendee?.firstName || null,
-            holderLastName: attendee?.lastName || null,
-            holderEmail: attendee?.email || null,
-            holderPhone: attendee?.phone || null,
-            status: 'ACTIVE',
-          },
-        });
-
-        attendeeIndex++;
-      }
-    }
-  });
-
-  revalidatePath('/account/orders');
-  revalidatePath('/account/tickets');
-
-  // Send confirmation email (fire-and-forget)
-  sendConfirmationEmailForOrder(orderId);
-}
-
-/**
  * Verify payment and confirm order (called from success page as fallback)
  */
 export async function verifyAndConfirmPaymentAction(
   orderId: string
 ): Promise<{ data: { status: 'confirmed' | 'pending' | 'failed' } } | { error: string }> {
   try {
+    const parsed = cancelOrderSchema.safeParse({ orderId });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message || 'Invalid order ID' };
+    }
+
     const session = await requireAuth();
     const userId = session.user.id;
 
     const order = await prisma.order.findUnique({
-      where: { id: orderId },
+      where: { id: parsed.data.orderId },
     });
 
     if (!order) {
@@ -1281,12 +967,17 @@ export async function cancelOrderAction(
   orderId: string
 ): Promise<{ success: true } | { error: string }> {
   try {
+    const parsed = cancelOrderSchema.safeParse({ orderId });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message || 'Invalid order ID' };
+    }
+
     const session = await requireAuth();
     const userId = session.user.id;
 
     // Find order and verify ownership
     const order = await prisma.order.findUnique({
-      where: { id: orderId },
+      where: { id: parsed.data.orderId },
       include: {
         items: true,
       },
@@ -1387,27 +1078,7 @@ export async function getPendingOrderForTenantAction(
           { expiresAt: { gt: new Date() } },
         ],
       },
-      include: {
-        event: true,
-        tenant: true,
-        items: {
-          include: {
-            ticketType: true,
-            tickets: {
-          include: {
-            ticketType: true,
-          },
-        },
-          },
-        },
-        tickets: {
-          include: {
-            ticketType: true,
-          },
-        },
-        promotion: true,
-        voucherCode: true,
-      },
+      include: ORDER_WITH_RELATIONS_INCLUDE,
       orderBy: {
         createdAt: 'desc',
       },
@@ -1430,32 +1101,17 @@ export async function getOrderForCheckoutAction(
   orderId: string
 ): Promise<{ data: OrderWithRelations } | { error: string }> {
   try {
+    const parsed = cancelOrderSchema.safeParse({ orderId });
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message || 'Invalid order ID' };
+    }
+
     const session = await requireAuth();
     const userId = session.user.id;
 
     const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        event: true,
-        tenant: true,
-        items: {
-          include: {
-            ticketType: true,
-            tickets: {
-          include: {
-            ticketType: true,
-          },
-        },
-          },
-        },
-        tickets: {
-          include: {
-            ticketType: true,
-          },
-        },
-        promotion: true,
-        voucherCode: true,
-      },
+      where: { id: parsed.data.orderId },
+      include: ORDER_WITH_RELATIONS_INCLUDE,
     });
 
     if (!order) {

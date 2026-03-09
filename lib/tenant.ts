@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { prisma } from './prisma';
 import { getCurrentUser } from './auth';
 import type { TenantMemberRole } from '@/prisma/generated/prisma/client';
@@ -20,9 +21,10 @@ export function hasMinimumRole(
 }
 
 /**
- * Validates if a tenant exists by subdomain
+ * Validates if a tenant exists by subdomain.
+ * Wrapped in React cache() to deduplicate within a single server request.
  */
-export async function getTenantBySubdomain(subdomain: string) {
+export const getTenantBySubdomain = cache(async (subdomain: string) => {
   try {
     const tenant = await prisma.tenant.findUnique({
       where: { subdomain },
@@ -32,6 +34,7 @@ export async function getTenantBySubdomain(subdomain: string) {
         name: true,
         ownerId: true,
         logoUrl: true,
+        status: true,
       },
     });
     return tenant;
@@ -39,7 +42,7 @@ export async function getTenantBySubdomain(subdomain: string) {
     console.error('Error fetching tenant:', error);
     return null;
   }
-}
+});
 
 /**
  * Get current tenant from subdomain in server components
@@ -47,6 +50,19 @@ export async function getTenantBySubdomain(subdomain: string) {
  */
 export async function getCurrentTenant(subdomain: string) {
   return await getTenantBySubdomain(subdomain);
+}
+
+/**
+ * Get tenant by subdomain only if it is ACTIVE.
+ * Returns null for non-existent, INACTIVE, or SUSPENDED tenants.
+ * Use in public-facing pages and checkout routes.
+ */
+export async function getActiveTenantBySubdomain(subdomain: string) {
+  const tenant = await getTenantBySubdomain(subdomain);
+  if (!tenant || tenant.status !== 'ACTIVE') {
+    return null;
+  }
+  return tenant;
 }
 
 /**

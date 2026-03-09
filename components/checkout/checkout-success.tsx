@@ -5,7 +5,8 @@ import { Separator } from '@/components/ui/separator';
 import { CheckCircle, Calendar, MapPin, Ticket, ExternalLink } from 'lucide-react';
 import { TicketQRCode } from '@/components/ui/ticket-qr-code';
 import { mainUrl } from '@/lib/url';
-import type { OrderWithRelations } from '@/app/actions/checkout';
+import type { CheckoutOrderWithRelations as OrderWithRelations } from '@/lib/types/order';
+import { formatPhp } from '@/lib/format';
 
 interface CheckoutSuccessProps {
   order: OrderWithRelations;
@@ -88,17 +89,17 @@ export function CheckoutSuccess({ order, tenantSubdomain }: CheckoutSuccessProps
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal</span>
-              <span>PHP {order.subtotal.toLocaleString()}</span>
+              <span>{formatPhp(order.subtotal)}</span>
             </div>
             {order.discountAmount > 0 && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>Discount</span>
-                <span>-PHP {order.discountAmount.toLocaleString()}</span>
+                <span>-{formatPhp(order.discountAmount)}</span>
               </div>
             )}
             <div className="flex justify-between font-semibold pt-2 border-t">
               <span>Total Paid</span>
-              <span>PHP {order.total.toLocaleString()}</span>
+              <span>{formatPhp(order.total)}</span>
             </div>
           </div>
         </CardContent>

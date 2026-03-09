@@ -51,7 +51,7 @@ export default async function PageSettingsPage({
 
   const result = await getTenantPageSettingsAction(subdomain);
 
-  if (result.error || !result.data) {
+  if ('error' in result) {
     redirect(`/dashboard/${subdomain}`);
   }
 

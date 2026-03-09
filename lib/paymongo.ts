@@ -69,45 +69,49 @@ export interface PaymentData {
 export async function createCheckoutSession(
   params: CreateCheckoutSessionParams
 ): Promise<CheckoutSessionResponse> {
+  const requestBody = {
+    data: {
+      attributes: {
+        line_items: params.lineItems.map((item) => ({
+          amount: item.amount,
+          currency: item.currency,
+          name: item.name,
+          quantity: item.quantity,
+          ...(item.description && { description: item.description }),
+        })),
+        payment_method_types: params.paymentMethodTypes,
+        ...(params.description && { description: params.description }),
+        ...(params.referenceNumber && { reference_number: params.referenceNumber }),
+        ...(params.successUrl && { success_url: params.successUrl }),
+        ...(params.cancelUrl && { cancel_url: params.cancelUrl }),
+        send_email_receipt: params.sendEmailReceipt ?? true,
+        show_line_items: true,
+        show_description: true,
+        ...(params.metadata && { metadata: params.metadata }),
+        ...(params.billing && {
+          billing: {
+            ...(params.billing.name && { name: params.billing.name }),
+            ...(params.billing.email && { email: params.billing.email }),
+            ...(params.billing.phone && { phone: params.billing.phone }),
+          },
+        }),
+      },
+    },
+  };
+
   const response = await fetch(`${PAYMONGO_API_URL}/checkout_sessions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: getAuthHeader(),
     },
-    body: JSON.stringify({
-      data: {
-        attributes: {
-          line_items: params.lineItems.map((item) => ({
-            amount: item.amount,
-            currency: item.currency,
-            name: item.name,
-            quantity: item.quantity,
-            ...(item.description && { description: item.description }),
-          })),
-          payment_method_types: params.paymentMethodTypes,
-          ...(params.description && { description: params.description }),
-          ...(params.referenceNumber && { reference_number: params.referenceNumber }),
-          ...(params.successUrl && { success_url: params.successUrl }),
-          ...(params.cancelUrl && { cancel_url: params.cancelUrl }),
-          send_email_receipt: params.sendEmailReceipt ?? true,
-          show_line_items: true,
-          show_description: true,
-          ...(params.metadata && { metadata: params.metadata }),
-          ...(params.billing && {
-            billing: {
-              ...(params.billing.name && { name: params.billing.name }),
-              ...(params.billing.email && { email: params.billing.email }),
-              ...(params.billing.phone && { phone: params.billing.phone }),
-            },
-          }),
-        },
-      },
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
+    console.error('[PayMongo] Error status:', response.status);
+    console.error('[PayMongo] Error body:', JSON.stringify(errorData, null, 2));
     const message = errorData?.errors?.[0]?.detail || `PayMongo API error: ${response.status}`;
     throw new Error(message);
   }

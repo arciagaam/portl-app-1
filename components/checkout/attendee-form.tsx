@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ChevronDown, ChevronUp, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { OrderWithRelations } from '@/app/actions/checkout';
+import type { CheckoutOrderWithRelations as OrderWithRelations } from '@/lib/types/order';
 
 interface AttendeeFormProps {
   order: OrderWithRelations;

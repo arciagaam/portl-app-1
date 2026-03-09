@@ -21,7 +21,7 @@ export default async function GalleryPage({
 
   const result = await getEventByIdForTenantAction(subdomain, eventId);
 
-  if (result.error || !result.data) {
+  if ('error' in result) {
     notFound();
   }
 

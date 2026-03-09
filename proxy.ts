@@ -19,15 +19,18 @@ import { auth } from '@/auth'
 const COMING_SOON = true
 
 export async function proxy(request: NextRequest) {
-    const host = request.headers.get('host') || ''
+    const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim()
+    const host = forwardedHost || request.headers.get('host') || ''
     const pathname = request.nextUrl.pathname
 
-    // Temporary: redirect everything to coming soon page
-    if (COMING_SOON) {
-        if (pathname.startsWith('/coming-soon')) {
-            return NextResponse.next()
-        }
-        return NextResponse.redirect(new URL('/coming-soon', request.url))
+    // Skip static files and API routes early
+    if (
+        pathname.startsWith('/_next') ||
+        pathname.startsWith('/api') ||
+        pathname.startsWith('/favicon') ||
+        /\.(?:ico|png|jpg|jpeg|gif|svg|webp|avif|css|js|woff|woff2|ttf|eot|map)$/i.test(pathname)
+    ) {
+        return NextResponse.next()
     }
 
     const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'lvh.me:3000'
@@ -35,8 +38,21 @@ export async function proxy(request: NextRequest) {
     const rootHostname = rootDomain.split(':')[0]
     const currentHostname = host.split(':')[0]
 
+    const stripPrefixFromPath = (path: string, prefix: string) => {
+        if (path === prefix) return '/'
+        if (path.startsWith(`${prefix}/`)) return path.slice(prefix.length) || '/'
+        return null
+    }
+
     // --- Admin subdomain ---
     if (currentHostname === `admin.${rootHostname}`) {
+        const strippedAdminPath = stripPrefixFromPath(pathname, '/admin')
+        if (strippedAdminPath) {
+            const canonicalAdminUrl = new URL(request.url)
+            canonicalAdminUrl.pathname = strippedAdminPath
+            return NextResponse.redirect(canonicalAdminUrl)
+        }
+
         return NextResponse.rewrite(new URL(`/admin${pathname}`, request.url))
     }
 
@@ -56,6 +72,14 @@ export async function proxy(request: NextRequest) {
         currentHostname.endsWith(`.${rootHostname}`)
     ) {
         const subdomain = currentHostname.replace(`.${rootHostname}`, '')
+        const strippedTenantPath = stripPrefixFromPath(pathname, `/t/${subdomain}`)
+
+        if (strippedTenantPath) {
+            const canonicalTenantUrl = new URL(request.url)
+            canonicalTenantUrl.pathname = strippedTenantPath
+            return NextResponse.redirect(canonicalTenantUrl)
+        }
+
         // Rewrite to internal /t/[tenant] routes
         return NextResponse.rewrite(new URL(`/t/${subdomain}${pathname}`, request.url))
     }
@@ -98,5 +122,7 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/((?!api|_next/static|_next/image|images|favicon.ico).*)'],
+    matcher: [
+        '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:ico|png|jpg|jpeg|gif|svg|webp|avif|css|js|woff|woff2|ttf|eot|map)$).*)',
+    ],
 }

@@ -74,7 +74,7 @@ export function AttendeesSection({
     async (ticketCode: string) => {
       const result = await checkInTicketAction(tenantSubdomain, ticketCode);
 
-      if (result.error) {
+      if ('error' in result) {
         return { success: false, message: result.error };
       }
 
@@ -97,7 +97,7 @@ export function AttendeesSection({
     const result = await undoCheckInAction(tenantSubdomain, ticketId);
     setLoadingTicketId(null);
 
-    if (!result.error) {
+    if (!('error' in result)) {
       startTransition(() => {
         router.refresh();
       });

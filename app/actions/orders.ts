@@ -3,36 +3,9 @@
 import { requireAuth, getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import type { Order, OrderItem, Ticket, Event, TicketType, Tenant, Promotion, VoucherCode } from '@/prisma/generated/prisma/client';
+import type { AccountOrderWithRelations, TicketWithRelations, OrderListItem } from '@/lib/types/order';
 
-// Types for order with relations
-export type OrderItemWithRelations = OrderItem & {
-  ticketType: TicketType;
-  tickets: Ticket[];
-};
-
-export type OrderWithRelations = Order & {
-  event: Event;
-  tenant: Tenant;
-  items: OrderItemWithRelations[];
-  tickets: TicketWithRelations[];
-  promotion: Promotion | null;
-  voucherCode: VoucherCode | null;
-};
-
-export type TicketWithRelations = Ticket & {
-  event: Event & { tenant: Tenant };
-  ticketType: TicketType;
-  order: Order;
-};
-
-export type OrderListItem = Order & {
-  event: Event & { tenant: Tenant };
-  _count: {
-    items: number;
-    tickets: number;
-  };
-};
+type OrderWithRelations = AccountOrderWithRelations;
 
 // ============================================================================
 // ORDER ACTIONS

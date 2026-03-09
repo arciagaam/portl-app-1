@@ -12,7 +12,7 @@ import { Plus, Trash2 } from 'lucide-react';
 export interface Venue {
   name: string;
   relationship: 'owner' | 'partner' | 'renter';
-  images: string[]; // URLs - max 2
+  images: (string | File)[]; // URLs or pending Files - max 2
 }
 
 interface VenuesFormProps {
@@ -27,7 +27,7 @@ export function VenuesForm({ initialData, onChange }: VenuesFormProps) {
       : [{ name: '', relationship: 'renter', images: [] }]
   );
 
-  const updateVenue = (index: number, field: keyof Venue, value: string | string[]) => {
+  const updateVenue = (index: number, field: keyof Venue, value: string | (string | File)[]) => {
     const newVenues = [...venues];
     newVenues[index] = { ...newVenues[index], [field]: value };
     setVenues(newVenues);
@@ -48,18 +48,18 @@ export function VenuesForm({ initialData, onChange }: VenuesFormProps) {
     onChange(newVenues);
   };
 
-  const handleImageUploaded = (venueIndex: number, url: string) => {
+  const handleImageAdded = (venueIndex: number, val: string | File) => {
     const venue = venues[venueIndex];
     if (venue.images.length >= 2) return;
-    const newImages = [...venue.images, url];
+    const newImages = [...venue.images, val];
     updateVenue(venueIndex, 'images', newImages);
   };
 
-  const handleImageReplaced = (venueIndex: number, imageIndex: number, url: string | undefined) => {
+  const handleImageChanged = (venueIndex: number, imageIndex: number, val: string | File | undefined) => {
     const venue = venues[venueIndex];
     const newImages = [...venue.images];
-    if (url) {
-      newImages[imageIndex] = url;
+    if (val) {
+      newImages[imageIndex] = val;
     } else {
       newImages.splice(imageIndex, 1);
     }
@@ -118,23 +118,21 @@ export function VenuesForm({ initialData, onChange }: VenuesFormProps) {
                   <FileUpload
                     key={`${venueIndex}-image-${imageIndex}`}
                     value={image}
-                    onChange={(url) => handleImageReplaced(venueIndex, imageIndex, url)}
-                    folder={`portfolio/venues/${venueIndex}`}
+                    onChange={(val) => handleImageChanged(venueIndex, imageIndex, val)}
                   />
                 ))}
                 {venue.images.length < 2 && (
                   <FileUpload
                     key={`${venueIndex}-image-new-${venue.images.length}`}
                     value={undefined}
-                    onChange={(url) => {
-                      if (url) handleImageUploaded(venueIndex, url);
+                    onChange={(val) => {
+                      if (val) handleImageAdded(venueIndex, val);
                     }}
-                    folder={`portfolio/venues/${venueIndex}`}
                   />
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {venue.images.length}/2 images uploaded
+                {venue.images.length}/2 images
               </p>
             </div>
           </CardContent>

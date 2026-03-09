@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyWebhookSignature } from '@/lib/paymongo';
 import { prisma } from '@/lib/prisma';
-import { confirmOrderFromPayment } from '@/app/actions/checkout';
+import { confirmOrderFromPayment } from '@/lib/checkout-internal';
 
 export async function POST(request: Request) {
   const webhookSecret = process.env.PAYMONGO_WEBHOOK_SECRET;

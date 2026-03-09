@@ -7,7 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, Tag, X } from 'lucide-react';
-import { applyVoucherCodeAction, removeVoucherCodeAction, type OrderWithRelations } from '@/app/actions/checkout';
+import { applyVoucherCodeAction, removeVoucherCodeAction } from '@/app/actions/checkout';
+import type { CheckoutOrderWithRelations as OrderWithRelations } from '@/lib/types/order';
+import { formatPhp } from '@/lib/format';
 
 interface OrderReviewProps {
   order: OrderWithRelations;
@@ -71,11 +73,11 @@ export function OrderReview({ order, onContinue, onOrderUpdate }: OrderReviewPro
                 <div>
                   <p className="font-medium">{item.ticketType.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {item.quantity} x PHP {item.unitPrice.toLocaleString()}
+                    {item.quantity} x {formatPhp(item.unitPrice)}
                   </p>
                 </div>
                 <p className="font-medium">
-                  PHP {item.totalPrice.toLocaleString()}
+                  {formatPhp(item.totalPrice)}
                 </p>
               </div>
             ))}
@@ -139,23 +141,23 @@ export function OrderReview({ order, onContinue, onOrderUpdate }: OrderReviewPro
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal</span>
-              <span>PHP {order.subtotal.toLocaleString()}</span>
+              <span>{formatPhp(order.subtotal)}</span>
             </div>
             {order.discountAmount > 0 && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>Discount</span>
-                <span>-PHP {order.discountAmount.toLocaleString()}</span>
+                <span>-{formatPhp(order.discountAmount)}</span>
               </div>
             )}
             {order.serviceFee > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Service Fee</span>
-                <span>PHP {order.serviceFee.toLocaleString()}</span>
+                <span>{formatPhp(order.serviceFee)}</span>
               </div>
             )}
             <div className="flex justify-between font-semibold text-lg pt-2 border-t">
               <span>Total</span>
-              <span>PHP {order.total.toLocaleString()}</span>
+              <span>{formatPhp(order.total)}</span>
             </div>
           </div>
         </CardContent>

@@ -40,7 +40,7 @@ export function EventHeader({ event, tenantSubdomain }: EventHeaderProps) {
     const result = await publishEventForTenantAction(tenantSubdomain, event.id);
     setIsLoading(false);
 
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       toast.success('Event published successfully');
@@ -57,7 +57,7 @@ export function EventHeader({ event, tenantSubdomain }: EventHeaderProps) {
     const result = await archiveEventForTenantAction(tenantSubdomain, event.id);
     setIsLoading(false);
 
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       toast.success('Event archived successfully');

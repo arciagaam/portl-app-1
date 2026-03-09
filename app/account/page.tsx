@@ -1,6 +1,5 @@
 import { getCurrentUser } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { unstable_noStore as noStore } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -22,7 +21,6 @@ async function getUserAffiliations(userId: string) {
 }
 
 export default async function AccountPage() {
-    noStore()
     const user = await getCurrentUser()
 
     if (!user) {

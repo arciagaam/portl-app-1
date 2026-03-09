@@ -60,7 +60,7 @@ export function PromotionsSection({ event, tenantSubdomain }: PromotionsSectionP
 
   const handleCreatePromotion = async (data: PromotionFormData) => {
     const result = await createPromotionForTenantAction(tenantSubdomain, event.id, data);
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       toast.success('Promotion created successfully');
@@ -76,7 +76,7 @@ export function PromotionsSection({ event, tenantSubdomain }: PromotionsSectionP
     setIsDeleting(promotionId);
     const result = await deletePromotionForTenantAction(tenantSubdomain, promotionId);
     setIsDeleting(null);
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       toast.success('Promotion deleted successfully');

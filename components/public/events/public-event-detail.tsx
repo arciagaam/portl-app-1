@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Calendar, Clock, MapPin } from 'lucide-react';
@@ -54,11 +55,14 @@ export function PublicEventDetail({ event, tenantSubdomain, tenantName }: Public
       {(() => {
         const heroUrl = event.thumbnailUrl || event.images?.[0]?.url;
         return heroUrl ? (
-          <div className="aspect-[2/1] overflow-hidden rounded-xl">
-            <img
+          <div className="relative aspect-[2/1] overflow-hidden rounded-xl">
+            <Image
               src={heroUrl}
               alt={event.name}
-              className="h-full w-full object-cover"
+              fill
+              sizes="100vw"
+              priority
+              className="object-cover"
             />
           </div>
         ) : null;
@@ -91,11 +95,13 @@ export function PublicEventDetail({ event, tenantSubdomain, tenantName }: Public
               <h2 className="text-xl font-semibold mb-4">Gallery</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {event.images.map((image) => (
-                  <div key={image.id} className="aspect-[4/3] overflow-hidden rounded-lg">
-                    <img
+                  <div key={image.id} className="relative aspect-[4/3] overflow-hidden rounded-lg">
+                    <Image
                       src={image.url}
                       alt={event.name}
-                      className="h-full w-full object-cover"
+                      fill
+                      sizes="(max-width: 768px) 50vw, 33vw"
+                      className="object-cover"
                     />
                   </div>
                 ))}

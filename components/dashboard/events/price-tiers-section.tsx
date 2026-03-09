@@ -21,6 +21,7 @@ import {
   deletePriceTierForTenantAction,
 } from '@/app/actions/tenant-events';
 import { toast } from 'sonner';
+import { formatPhp } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import type { PriceTierFormData } from '@/lib/validations/events';
 
@@ -47,7 +48,7 @@ export function PriceTiersSection({ ticketType, tenantSubdomain }: PriceTiersSec
 
   const handleCreatePriceTier = async (data: PriceTierFormData) => {
     const result = await createPriceTierForTenantAction(tenantSubdomain, ticketType.id, data);
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       toast.success('Price tier created successfully');
@@ -63,7 +64,7 @@ export function PriceTiersSection({ ticketType, tenantSubdomain }: PriceTiersSec
     setIsDeleting(priceTierId);
     const result = await deletePriceTierForTenantAction(tenantSubdomain, priceTierId);
     setIsDeleting(null);
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       toast.success('Price tier deleted successfully');
@@ -86,14 +87,6 @@ export function PriceTiersSection({ ticketType, tenantSubdomain }: PriceTiersSec
   };
 
   const activeTier = getActiveTier();
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const formatDateTime = (date: Date) => {
     return new Date(date).toLocaleString('en-US', {
@@ -138,7 +131,7 @@ export function PriceTiersSection({ ticketType, tenantSubdomain }: PriceTiersSec
       {ticketType.priceTiers.length === 0 ? (
         <div className="border rounded-lg p-6 text-center">
           <p className="text-muted-foreground mb-4">
-            No price tiers configured. Base price ({formatCurrency(ticketType.basePrice)}) will be used.
+            No price tiers configured. Base price ({formatPhp(ticketType.basePrice)}) will be used.
           </p>
           <Button size="sm" variant="outline" onClick={() => setCreateDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -166,7 +159,7 @@ export function PriceTiersSection({ ticketType, tenantSubdomain }: PriceTiersSec
                 return (
                   <TableRow key={tier.id}>
                     <TableCell className="font-medium">{tier.name}</TableCell>
-                    <TableCell>{formatCurrency(tier.price)}</TableCell>
+                    <TableCell>{formatPhp(tier.price)}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{strategyLabels[tier.strategy]}</Badge>
                     </TableCell>

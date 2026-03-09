@@ -17,7 +17,7 @@ export function QuickCheckIn({ tenantSubdomain, eventId }: QuickCheckInProps) {
     async (ticketCode: string) => {
       const result = await checkInTicketAction(tenantSubdomain, ticketCode);
 
-      if (result.error) {
+      if ('error' in result) {
         return { success: false, message: result.error };
       }
 

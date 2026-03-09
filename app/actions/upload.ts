@@ -8,6 +8,14 @@ export type UploadResult =
   | { data: { url: string } }
   | { error: string };
 
+const ALLOWED_FOLDER_PREFIXES = [
+  'avatars',
+  'identity-verification',
+  'events/',
+  'ticket-types',
+  'tenants/',
+];
+
 export async function uploadFileAction(formData: FormData): Promise<UploadResult> {
   const user = await getCurrentUser();
   if (!user) {
@@ -23,6 +31,10 @@ export async function uploadFileAction(formData: FormData): Promise<UploadResult
 
   if (!folder) {
     return { error: 'Upload folder is required' };
+  }
+
+  if (!ALLOWED_FOLDER_PREFIXES.some(prefix => folder === prefix || folder.startsWith(prefix))) {
+    return { error: 'Invalid upload folder' };
   }
 
   if (
@@ -68,6 +80,16 @@ export async function deleteFileAction(
 
   if (!url || !url.includes('.public.blob.vercel-storage.com')) {
     return { error: 'Invalid blob URL' };
+  }
+
+  // Verify the file belongs to this user (upload path includes userId)
+  try {
+    const urlPath = new URL(url).pathname;
+    if (!urlPath.includes(user.id)) {
+      return { error: 'You do not have permission to delete this file' };
+    }
+  } catch {
+    return { error: 'Invalid URL format' };
   }
 
   try {

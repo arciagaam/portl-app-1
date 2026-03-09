@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, MapPin, ChevronRight, Ticket } from 'lucide-react';
-import type { TicketWithRelations } from '@/app/actions/orders';
+import type { TicketWithRelations } from '@/lib/types/order';
 
 interface TicketsListProps {
   tickets: TicketWithRelations[];

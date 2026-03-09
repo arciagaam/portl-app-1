@@ -1,5 +1,6 @@
 import { getCurrentUser } from '@/lib/auth';
 import { redirect, notFound } from 'next/navigation';
+import { prisma } from '@/lib/prisma';
 import { getEventByIdForTenantAction } from '@/app/actions/tenant-events';
 import { EventHeader } from '@/components/dashboard/events/event-header';
 import { EventStatsCards } from '@/components/dashboard/events/event-stats-cards';
@@ -23,14 +24,13 @@ export default async function EventDetailPage({
 
   const result = await getEventByIdForTenantAction(subdomain, eventId);
 
-  if (result.error || !result.data) {
+  if ('error' in result) {
     notFound();
   }
 
   const event = result.data;
 
   // Get order and attendee counts for sub-nav
-  const { prisma } = await import('@/lib/prisma');
   const [orderCount, attendeeCount] = await Promise.all([
     prisma.order.count({
       where: { eventId, tenantId: event.tenantId, status: 'CONFIRMED' },

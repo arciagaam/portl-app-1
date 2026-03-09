@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator'
 import { ArrowLeft, Calendar, MapPin, Ticket, ExternalLink } from 'lucide-react'
 import { tenantUrl } from '@/lib/url'
 import { getOrderByIdAction } from '@/app/actions/orders'
+import type { AccountOrderWithRelations } from '@/lib/types/order'
 
 interface OrderDetailPageProps {
     params: Promise<{
@@ -47,7 +48,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
         notFound()
     }
 
-    const order = result.data
+    const order = result.data as AccountOrderWithRelations
 
     const formatDate = (date: Date) => {
         return new Date(date).toLocaleDateString('en-US', {

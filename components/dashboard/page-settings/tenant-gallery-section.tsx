@@ -21,6 +21,7 @@ import {
 } from '@/app/actions/tenant-page';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { uploadPendingFile } from '@/lib/upload';
 
 interface TenantGallerySectionProps {
   tenant: {
@@ -35,23 +36,37 @@ const MAX_IMAGES = 12;
 export function TenantGallerySection({ tenant, tenantSubdomain }: TenantGallerySectionProps) {
   const router = useRouter();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [uploadedUrl, setUploadedUrl] = useState<string | undefined>();
+  const [pendingFile, setPendingFile] = useState<string | File | undefined>();
+  const [isAdding, setIsAdding] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState(false);
 
   const handleAddImage = useCallback(async () => {
-    if (!uploadedUrl) return;
+    if (!pendingFile) return;
 
-    const result = await addTenantImageAction(tenantSubdomain, uploadedUrl);
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success('Image added to gallery');
-      setAddDialogOpen(false);
-      setUploadedUrl(undefined);
-      router.refresh();
+    setIsAdding(true);
+    try {
+      const url = await uploadPendingFile(pendingFile, `tenants/${tenant.id}/gallery`);
+      if (!url) {
+        toast.error('Upload failed');
+        return;
+      }
+
+      const result = await addTenantImageAction(tenantSubdomain, url);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success('Image added to gallery');
+        setAddDialogOpen(false);
+        setPendingFile(undefined);
+        router.refresh();
+      }
+    } catch {
+      toast.error('Failed to upload image');
+    } finally {
+      setIsAdding(false);
     }
-  }, [uploadedUrl, tenantSubdomain, router]);
+  }, [pendingFile, tenantSubdomain, tenant.id, router]);
 
   const handleDeleteImage = async (imageId: string) => {
     if (!confirm('Are you sure you want to delete this image?')) return;
@@ -106,7 +121,7 @@ export function TenantGallerySection({ tenant, tenantSubdomain }: TenantGalleryS
           open={addDialogOpen}
           onOpenChange={(open) => {
             setAddDialogOpen(open);
-            if (!open) setUploadedUrl(undefined);
+            if (!open) setPendingFile(undefined);
           }}
         >
           <DialogTrigger asChild>
@@ -124,22 +139,22 @@ export function TenantGallerySection({ tenant, tenantSubdomain }: TenantGalleryS
             </DialogHeader>
             <div className="space-y-4">
               <FileUpload
-                value={uploadedUrl}
-                onChange={(url) => setUploadedUrl(url)}
-                folder={`tenants/${tenant.id}/gallery`}
+                value={pendingFile}
+                onChange={(val) => setPendingFile(val)}
               />
               <div className="flex justify-end gap-2">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setAddDialogOpen(false);
-                    setUploadedUrl(undefined);
+                    setPendingFile(undefined);
                   }}
+                  disabled={isAdding}
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleAddImage} disabled={!uploadedUrl}>
-                  Add to Gallery
+                <Button onClick={handleAddImage} disabled={!pendingFile || isAdding}>
+                  {isAdding ? 'Uploading...' : 'Add to Gallery'}
                 </Button>
               </div>
             </div>

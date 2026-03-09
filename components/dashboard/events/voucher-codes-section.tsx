@@ -41,7 +41,7 @@ export function VoucherCodesSection({ promotion, tenantSubdomain }: VoucherCodes
 
   const handleCreateVoucherCode = async (data: VoucherCodeFormData) => {
     const result = await createVoucherCodeForTenantAction(tenantSubdomain, promotion.id, data);
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       toast.success('Voucher code created successfully');
@@ -57,7 +57,7 @@ export function VoucherCodesSection({ promotion, tenantSubdomain }: VoucherCodes
     setIsDeleting(voucherCodeId);
     const result = await deleteVoucherCodeForTenantAction(tenantSubdomain, voucherCodeId);
     setIsDeleting(null);
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       toast.success('Voucher code deleted successfully');

@@ -9,6 +9,17 @@ async function getTenantEvents(userId: string, subdomain: string) {
     include: {
       application: true,
       events: {
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          status: true,
+          startDate: true,
+          endDate: true,
+          startTime: true,
+          endTime: true,
+          venueName: true,
+        },
         orderBy: { startDate: 'desc' },
       },
     },

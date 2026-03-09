@@ -19,6 +19,7 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { uploadPendingFile } from '@/lib/upload';
 
 interface EventFormProps {
   tenantSubdomain: string;
@@ -31,6 +32,9 @@ export function EventForm({ tenantSubdomain, defaultValues, eventId, onSubmit }:
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [thumbnailFile, setThumbnailFile] = useState<string | File | undefined>(
+    defaultValues?.thumbnailUrl ?? undefined
+  );
 
   const {
     register,
@@ -50,6 +54,16 @@ export function EventForm({ tenantSubdomain, defaultValues, eventId, onSubmit }:
   const onSubmitForm = async (data: EventFormData) => {
     setIsLoading(true);
     setMessage(null);
+
+    try {
+      const thumbnailUrl = await uploadPendingFile(thumbnailFile, 'events/thumbnails');
+      data.thumbnailUrl = thumbnailUrl ?? null;
+    } catch {
+      setIsLoading(false);
+      setMessage({ type: 'error', text: 'Failed to upload thumbnail. Please try again.' });
+      toast.error('Failed to upload thumbnail');
+      return;
+    }
 
     const result = await onSubmit(data);
 
@@ -90,9 +104,8 @@ export function EventForm({ tenantSubdomain, defaultValues, eventId, onSubmit }:
       <FileUpload
         label="Event Thumbnail"
         description="Optional. If not set, the first gallery image will be used."
-        folder="events/thumbnails"
-        value={watch('thumbnailUrl') || undefined}
-        onChange={(url) => setValue('thumbnailUrl', url ?? null)}
+        value={thumbnailFile}
+        onChange={(val) => setThumbnailFile(val)}
         disabled={isLoading}
       />
 

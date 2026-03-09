@@ -7,10 +7,21 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { Plus, Calendar, MapPin, Clock } from 'lucide-react';
-import { Event } from '@/prisma/generated/prisma/client';
+
+type EventListItem = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+  startDate: Date;
+  endDate: Date;
+  startTime: string;
+  endTime: string;
+  venueName: string;
+};
 
 interface EventsListProps {
-  events: Event[];
+  events: EventListItem[];
   tenantSubdomain: string;
   tenantName: string;
 }

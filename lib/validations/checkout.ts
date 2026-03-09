@@ -81,6 +81,13 @@ export const createPaymentSessionSchema = z.object({
 
 export type CreatePaymentSessionData = z.infer<typeof createPaymentSessionSchema>;
 
+// Complete checkout with optional attendees (for placeholder payment flow)
+export const completeCheckoutWithAttendeesSchema = completeCheckoutSchema.extend({
+  attendees: z.array(paymentAttendeeSchema).optional(),
+});
+
+export type CompleteCheckoutWithAttendeesData = z.infer<typeof completeCheckoutWithAttendeesSchema>;
+
 // Order cancellation validation
 export const cancelOrderSchema = z.object({
   orderId: z.string().cuid('Invalid order ID'),

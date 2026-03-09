@@ -5,28 +5,33 @@ import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/admin'
 
 /**
- * Get all tenants with owner and application details
+ * Get tenants with owner and application details (paginated)
  */
-export async function getAllTenantsAction() {
+export async function getAllTenantsAction(page = 1, pageSize = 50) {
   try {
     await requireAdmin()
 
-    const tenants = await prisma.tenant.findMany({
-      include: {
-        owner: {
-          select: { id: true, firstName: true, lastName: true, email: true, role: true },
+    const [tenants, total] = await Promise.all([
+      prisma.tenant.findMany({
+        include: {
+          owner: {
+            select: { id: true, firstName: true, lastName: true, email: true, role: true },
+          },
+          application: {
+            select: { id: true, status: true },
+          },
+          _count: {
+            select: { events: true, orders: true },
+          },
         },
-        application: {
-          select: { id: true, status: true },
-        },
-        _count: {
-          select: { events: true, orders: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.tenant.count(),
+    ])
 
-    return { data: tenants }
+    return { data: tenants, total, page, pageSize }
   } catch (error) {
     console.error('Error fetching tenants:', error)
     return { error: 'Failed to fetch tenants' }

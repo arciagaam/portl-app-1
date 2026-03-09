@@ -1,6 +1,6 @@
 'use server';
 
-import { getCurrentTenant } from '@/lib/tenant';
+import { getActiveTenantBySubdomain } from '@/lib/tenant';
 import { prisma } from '@/lib/prisma';
 
 /**
@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma';
  */
 export async function getPublicEventsForTenant(subdomain: string) {
   try {
-    const tenant = await getCurrentTenant(subdomain);
+    const tenant = await getActiveTenantBySubdomain(subdomain);
     if (!tenant) {
       return { error: 'Tenant not found' };
     }
@@ -48,7 +48,7 @@ export async function getPublicEventsForTenant(subdomain: string) {
  */
 export async function getPublicEventById(subdomain: string, eventId: string) {
   try {
-    const tenant = await getCurrentTenant(subdomain);
+    const tenant = await getActiveTenantBySubdomain(subdomain);
     if (!tenant) {
       return { error: 'Tenant not found' };
     }

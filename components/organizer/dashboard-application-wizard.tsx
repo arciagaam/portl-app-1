@@ -5,6 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Stepper, type Step } from '@/components/ui/stepper';
 import { EventPortfolioForm, type EventPortfolioData } from '@/components/organizer/event-portfolio';
+import type { PastEvent } from '@/components/organizer/event-portfolio/past-events-form';
+import type { Venue } from '@/components/organizer/event-portfolio/venues-form';
+import type { ArtistsTalent } from '@/components/organizer/event-portfolio/artists-form';
+import type { Reference } from '@/components/organizer/event-portfolio/references-form';
 import { IdentityVerificationForm, type IdentityVerificationData } from '@/components/organizer/identity-verification-form';
 import { AgreementsForm, type AgreementsData } from '@/components/organizer/agreements-form';
 import { ReviewForm } from '@/components/organizer/review-form';
@@ -85,10 +89,10 @@ export function DashboardApplicationWizard({
   ];
 
   const eventPortfolioData: EventPortfolioData = {
-    pastEvents: application?.pastEvents as any,
-    venues: application?.venuesWorkedWith as any,
-    artistsTalent: application?.artistsTalent as any,
-    references: application?.references as any,
+    pastEvents: application?.pastEvents as PastEvent[] | undefined,
+    venues: application?.venuesWorkedWith as Venue[] | undefined,
+    artistsTalent: application?.artistsTalent as ArtistsTalent | undefined,
+    references: application?.references as Reference[] | undefined,
   };
 
   const identityVerificationData: IdentityVerificationData = {

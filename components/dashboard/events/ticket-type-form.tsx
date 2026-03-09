@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { FileUpload } from '@/components/ui/file-upload';
 import { Table } from '@/prisma/generated/prisma/client';
+import { uploadPendingFile } from '@/lib/upload';
 
 interface TicketTypeFormProps {
   tables: Table[];
@@ -31,6 +32,10 @@ interface TicketTypeFormProps {
 export function TicketTypeForm({ tables, defaultValues, onSubmit, onCancel, isEdit, quantitySold }: TicketTypeFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const hasSales = (quantitySold ?? 0) > 0;
+  const [imageFile, setImageFile] = useState<string | File | undefined>(
+    defaultValues?.imageUrl ?? undefined
+  );
+
   const {
     register,
     handleSubmit,
@@ -58,9 +63,10 @@ export function TicketTypeForm({ tables, defaultValues, onSubmit, onCancel, isEd
   const availableTables = kind === 'TABLE' || kind === 'SEAT' ? tables : [];
 
   const onSubmitForm = async (data: TicketTypeFormData) => {
-    console.log('Form submitting with data:', data);
     setIsLoading(true);
     try {
+      const imageUrl = await uploadPendingFile(imageFile, 'ticket-types');
+      data.imageUrl = imageUrl ?? null;
       await onSubmit(data);
     } catch (error) {
       console.error('Form submission error:', error);
@@ -115,9 +121,8 @@ export function TicketTypeForm({ tables, defaultValues, onSubmit, onCancel, isEd
       <FileUpload
         label="Ticket Image"
         description="Optional image shown on public ticket listing"
-        folder="ticket-types"
-        value={watch('imageUrl') || undefined}
-        onChange={(url) => setValue('imageUrl', url ?? null)}
+        value={imageFile}
+        onChange={(val) => setImageFile(val)}
         disabled={isLoading}
       />
 

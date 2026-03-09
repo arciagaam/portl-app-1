@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { getPublicTenantPageData } from '@/app/actions/tenant-page';
 import { PublicEventCard } from '@/components/public/events/public-event-card';
@@ -61,9 +62,11 @@ export default async function TenantLandingPage({ params }: PageProps) {
         {/* Content */}
         <div className="relative z-10 text-center px-6 py-20 max-w-3xl mx-auto">
           {tenant.logoUrl && (
-            <img
+            <Image
               src={tenant.logoUrl}
               alt={tenant.name}
+              width={200}
+              height={80}
               className="h-20 w-auto mx-auto mb-6 object-contain"
             />
           )}
@@ -126,11 +129,13 @@ export default async function TenantLandingPage({ params }: PageProps) {
                   key={image.id}
                   className="group overflow-hidden rounded-lg"
                 >
-                  <div className="aspect-[16/9] overflow-hidden">
-                    <img
+                  <div className="relative aspect-[16/9] overflow-hidden">
+                    <Image
                       src={image.url}
                       alt={`${tenant.name} gallery ${index + 1}`}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   </div>
                 </div>

@@ -24,6 +24,7 @@ import {
 } from '@/app/actions/tenant-events';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { formatPhp } from '@/lib/format';
 import type { TicketTypeFormData } from '@/lib/validations/events';
 
 type EventWithTicketTypes = Event & Prisma.EventGetPayload<{
@@ -68,11 +69,9 @@ export function TicketsSection({ event, tenantSubdomain }: TicketsSectionProps) 
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
   const handleCreateTicketType = async (data: TicketTypeFormData) => {
-    console.log('Creating ticket type:', data);
     try {
       const result = await createTicketTypeForTenantAction(tenantSubdomain, event.id, data);
-      console.log('Server action result:', result);
-      if (result.error) {
+      if ('error' in result) {
         toast.error(result.error);
       } else {
         toast.success('Ticket type created successfully');
@@ -89,7 +88,7 @@ export function TicketsSection({ event, tenantSubdomain }: TicketsSectionProps) 
     if (!editingTicketType) return;
     try {
       const result = await updateTicketTypeForTenantAction(tenantSubdomain, editingTicketType, data);
-      if (result.error) {
+      if ('error' in result) {
         toast.error(result.error);
       } else {
         toast.success('Ticket type updated successfully');
@@ -109,20 +108,12 @@ export function TicketsSection({ event, tenantSubdomain }: TicketsSectionProps) 
     setIsDeleting(ticketTypeId);
     const result = await deleteTicketTypeForTenantAction(tenantSubdomain, ticketTypeId);
     setIsDeleting(null);
-    if (result.error) {
+    if ('error' in result) {
       toast.error(result.error);
     } else {
       toast.success('Ticket type deleted successfully');
       router.refresh();
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-      minimumFractionDigits: 0,
-    }).format(amount);
   };
 
   return (
@@ -203,7 +194,7 @@ export function TicketsSection({ event, tenantSubdomain }: TicketsSectionProps) 
                         {kindLabels[ticketType.kind]}
                       </Badge>
                     </TableCell>
-                    <TableCell>{formatCurrency(ticketType.basePrice)}</TableCell>
+                    <TableCell>{formatPhp(ticketType.basePrice)}</TableCell>
                     <TableCell>
                       {ticketType.quantityTotal
                         ? `${ticketType.quantitySold}/${ticketType.quantityTotal}`

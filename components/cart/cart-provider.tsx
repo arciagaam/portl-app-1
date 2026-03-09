@@ -13,7 +13,17 @@ interface CartContextValue {
   refreshCart: () => Promise<void>;
 }
 
-const CartContext = createContext<CartContextValue | null>(null);
+const NOOP_CART: CartContextValue = {
+  cartSummary: null,
+  isLoading: false,
+  isOpen: false,
+  openCart: () => {},
+  closeCart: () => {},
+  toggleCart: () => {},
+  refreshCart: async () => {},
+};
+
+const CartContext = createContext<CartContextValue>(NOOP_CART);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartSummary, setCartSummary] = useState<CartSummary | null>(null);
@@ -61,9 +71,5 @@ export function CartProvider({ children }: { children: ReactNode }) {
 }
 
 export function useCart() {
-  const context = useContext(CartContext);
-  if (!context) {
-    throw new Error('useCart must be used within a CartProvider');
-  }
-  return context;
+  return useContext(CartContext);
 }

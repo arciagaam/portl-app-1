@@ -100,6 +100,11 @@ export async function acceptInvitationAction(token: string) {
       return { error: 'This invitation has expired' };
     }
 
+    // Verify the accepting user's email matches the invitation
+    if (user.email?.toLowerCase() !== invitation.email.toLowerCase()) {
+      return { error: 'This invitation was sent to a different email address' };
+    }
+
     // Check if user is already a member
     const existingMember = await prisma.tenantMember.findUnique({
       where: {
