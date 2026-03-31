@@ -350,10 +350,10 @@ export async function saveApplicationAction(
     if (step === 1) {
       // Event Portfolio (4 parts) — validated above
       const d = data as z.infer<typeof applicationStep1Schema>;
-      updateData.pastEvents = d.pastEvents;
-      updateData.venuesWorkedWith = d.venues;
-      updateData.artistsTalent = d.artistsTalent;
-      updateData.references = d.references;
+      updateData.pastEvents = d.pastEvents ?? undefined;
+      updateData.venuesWorkedWith = d.venues ?? undefined;
+      updateData.artistsTalent = d.artistsTalent ?? undefined;
+      updateData.references = d.references ?? undefined;
       if (!shouldExit) {
         updateData.currentStep = 2;
       }
