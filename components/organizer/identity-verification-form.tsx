@@ -43,9 +43,9 @@ export function IdentityVerificationForm({
       uploadPendingFile(businessId, 'identity-verification'),
     ]);
     return {
-      governmentIdUrl: governmentIdUrl || '',
-      selfieWithIdUrl: selfieWithIdUrl || '',
-      businessIdUrl: businessIdUrl || '',
+      governmentIdUrl: governmentIdUrl || undefined,
+      selfieWithIdUrl: selfieWithIdUrl || undefined,
+      businessIdUrl: businessIdUrl || undefined,
     };
   };
 

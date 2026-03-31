@@ -14,26 +14,33 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, UserPlus, Mail, Trash2, Clock } from 'lucide-react';
 import { removeTeamMemberAction, revokeInvitationAction } from '@/app/actions/tenant-members';
+import { assignRoleToMemberAction, removeRoleFromMemberAction } from '@/app/actions/tenant-roles';
 import { InviteMemberForm } from './invite-member-form';
 import { EditMemberForm } from './edit-member-form';
 import { toast } from 'sonner';
-import type { TenantMemberRole } from '@/prisma/generated/prisma/client';
 import { formatDistanceToNow } from 'date-fns';
 
-const roleColors: Record<string, string> = {
-  OWNER: 'bg-amber-500/20 text-amber-400',
-  ADMIN: 'bg-purple-500/20 text-purple-400',
-  MANAGER: 'bg-blue-500/20 text-blue-400',
-  MEMBER: 'bg-muted text-muted-foreground',
-};
+interface TenantRoleInfo {
+  id: string;
+  name: string;
+  color: string;
+  permissions: string[];
+  isOwnerRole: boolean;
+  position: number;
+}
+
+interface MemberRoleInfo {
+  id: string;
+  role: TenantRoleInfo;
+}
 
 interface Member {
   id: string;
-  role: TenantMemberRole;
   title: string | null;
   userShowInProfile: boolean;
   tenantShowInProfile: boolean;
   createdAt: Date;
+  memberRoles: MemberRoleInfo[];
   user: {
     id: string;
     firstName: string | null;
@@ -45,7 +52,8 @@ interface Member {
 interface Invitation {
   id: string;
   email: string;
-  role: TenantMemberRole;
+  roleIds: string[];
+  roles: { id: string; name: string; color: string }[];
   title: string | null;
   expiresAt: Date;
   createdAt: Date;
@@ -59,16 +67,21 @@ interface Invitation {
 interface TeamSectionProps {
   members: Member[];
   invitations: Invitation[];
-  currentUserRole: TenantMemberRole;
+  permissions: string[];
   subdomain: string;
+  tenantRoles: { id: string; name: string; color: string }[];
 }
 
-export function TeamSection({ members, invitations, currentUserRole, subdomain }: TeamSectionProps) {
+export function TeamSection({ members, invitations, permissions, subdomain, tenantRoles }: TeamSectionProps) {
   const router = useRouter();
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
 
-  const isOwner = currentUserRole === 'OWNER';
+  const canManageTeam = permissions.includes('manage_team');
+  const isOwner = members.some((m) =>
+    m.memberRoles.some((mr) => mr.role.isOwnerRole) &&
+    m.user.id === editingMember?.user.id
+  );
 
   const handleRemoveMember = async (memberId: string, memberName: string) => {
     if (!confirm(`Remove ${memberName} from the team?`)) return;
@@ -92,6 +105,26 @@ export function TeamSection({ members, invitations, currentUserRole, subdomain }
     }
   };
 
+  const handleAssignRole = async (memberId: string, roleId: string) => {
+    const result = await assignRoleToMemberAction(subdomain, memberId, roleId);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success('Role assigned');
+      router.refresh();
+    }
+  };
+
+  const handleRemoveRole = async (memberId: string, roleId: string) => {
+    const result = await removeRoleFromMemberAction(subdomain, memberId, roleId);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success('Role removed');
+      router.refresh();
+    }
+  };
+
   const formatName = (firstName: string | null, lastName: string | null, email: string) => {
     if (firstName && lastName) return `${firstName} ${lastName}`;
     if (firstName) return firstName;
@@ -108,17 +141,22 @@ export function TeamSection({ members, invitations, currentUserRole, subdomain }
               <CardTitle>Members</CardTitle>
               <CardDescription>{members.length} team member{members.length !== 1 ? 's' : ''}</CardDescription>
             </div>
-            <Button onClick={() => setShowInviteDialog(true)}>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Invite Member
-            </Button>
+            {canManageTeam && (
+              <Button onClick={() => setShowInviteDialog(true)}>
+                <UserPlus className="mr-2 h-4 w-4" />
+                Invite Member
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {members.map((member) => {
               const name = formatName(member.user.firstName, member.user.lastName, member.user.email);
-              const canManage = member.role !== 'OWNER' && (isOwner || (currentUserRole === 'ADMIN' && member.role !== 'ADMIN'));
+              const memberIsOwner = member.memberRoles.some((mr) => mr.role.isOwnerRole);
+              const canManageMember = canManageTeam && !memberIsOwner;
+              const assignedRoleIds = new Set(member.memberRoles.map((mr) => mr.role.id));
+              const availableRoles = tenantRoles.filter((r) => !assignedRoleIds.has(r.id));
 
               return (
                 <div
@@ -135,8 +173,22 @@ export function TeamSection({ members, invitations, currentUserRole, subdomain }
                     {member.title && (
                       <span className="text-xs text-muted-foreground">{member.title}</span>
                     )}
-                    <Badge className={roleColors[member.role]}>{member.role}</Badge>
-                    {canManage && (
+                    <div className="flex gap-1 flex-wrap">
+                      {member.memberRoles.map((mr) => (
+                        <Badge
+                          key={mr.id}
+                          style={{
+                            backgroundColor: `${mr.role.color}20`,
+                            color: mr.role.color,
+                            borderColor: `${mr.role.color}40`,
+                          }}
+                          className="border text-xs"
+                        >
+                          {mr.role.name}
+                        </Badge>
+                      ))}
+                    </div>
+                    {canManageMember && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">
@@ -147,6 +199,36 @@ export function TeamSection({ members, invitations, currentUserRole, subdomain }
                           <DropdownMenuItem onClick={() => setEditingMember(member)}>
                             Edit
                           </DropdownMenuItem>
+                          {availableRoles.length > 0 && (
+                            <>
+                              <DropdownMenuSeparator />
+                              {availableRoles.map((role) => (
+                                <DropdownMenuItem
+                                  key={role.id}
+                                  onClick={() => handleAssignRole(member.id, role.id)}
+                                >
+                                  <span className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: role.color }} />
+                                  Add {role.name}
+                                </DropdownMenuItem>
+                              ))}
+                            </>
+                          )}
+                          {member.memberRoles.filter((mr) => !mr.role.isOwnerRole).length > 0 && (
+                            <>
+                              <DropdownMenuSeparator />
+                              {member.memberRoles
+                                .filter((mr) => !mr.role.isOwnerRole)
+                                .map((mr) => (
+                                  <DropdownMenuItem
+                                    key={mr.id}
+                                    onClick={() => handleRemoveRole(member.id, mr.role.id)}
+                                    className="text-orange-500"
+                                  >
+                                    Remove {mr.role.name}
+                                  </DropdownMenuItem>
+                                ))}
+                            </>
+                          )}
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => handleRemoveMember(member.id, name)}
@@ -194,15 +276,31 @@ export function TeamSection({ members, invitations, currentUserRole, subdomain }
                     {invitation.title && (
                       <span className="text-xs text-muted-foreground">{invitation.title}</span>
                     )}
-                    <Badge className={roleColors[invitation.role]}>{invitation.role}</Badge>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRevokeInvitation(invitation.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      Revoke
-                    </Button>
+                    <div className="flex gap-1">
+                      {invitation.roles.map((role) => (
+                        <Badge
+                          key={role.id}
+                          style={{
+                            backgroundColor: `${role.color}20`,
+                            color: role.color,
+                            borderColor: `${role.color}40`,
+                          }}
+                          className="border text-xs"
+                        >
+                          {role.name}
+                        </Badge>
+                      ))}
+                    </div>
+                    {canManageTeam && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRevokeInvitation(invitation.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        Revoke
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -212,11 +310,14 @@ export function TeamSection({ members, invitations, currentUserRole, subdomain }
       )}
 
       {/* Invite Dialog */}
-      <InviteMemberForm
-        open={showInviteDialog}
-        onOpenChange={setShowInviteDialog}
-        subdomain={subdomain}
-      />
+      {canManageTeam && (
+        <InviteMemberForm
+          open={showInviteDialog}
+          onOpenChange={setShowInviteDialog}
+          subdomain={subdomain}
+          tenantRoles={tenantRoles}
+        />
+      )}
 
       {/* Edit Dialog */}
       {editingMember && (
@@ -225,7 +326,6 @@ export function TeamSection({ members, invitations, currentUserRole, subdomain }
           onOpenChange={(open) => !open && setEditingMember(null)}
           member={editingMember}
           subdomain={subdomain}
-          isOwner={isOwner}
         />
       )}
     </div>

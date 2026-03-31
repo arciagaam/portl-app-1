@@ -9,18 +9,10 @@ import { Home, Ticket, Receipt, Settings, Building2, Plus, ArrowLeft, ChevronDow
 import { cn } from '@/lib/utils'
 import { Separator } from '@/components/ui/separator'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import type { TenantMemberRole } from '@/prisma/generated/prisma/client'
-
-const roleColors: Record<string, string> = {
-  OWNER: 'bg-amber-500/20 text-amber-400',
-  ADMIN: 'bg-purple-500/20 text-purple-400',
-  MANAGER: 'bg-blue-500/20 text-blue-400',
-  MEMBER: 'bg-muted text-muted-foreground',
-}
 
 type Organization = {
   id: string
-  role: TenantMemberRole
+  memberRoles: { role: { name: string; color: string } }[]
   tenant: { name: string; subdomain: string }
 }
 
@@ -100,21 +92,30 @@ export default function AccountSidebar({
               )} />
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-1 space-y-0.5 pl-4">
-              {organizations.map((org) => (
-                <Link
-                  key={org.id}
-                  href={`/dashboard/${org.tenant.subdomain}`}
-                  className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-md text-sm transition-colors hover:bg-accent hover:text-accent-foreground text-foreground"
-                >
-                  <span className="truncate">{org.tenant.name}</span>
-                  <span className={cn(
-                    "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none",
-                    roleColors[org.role]
-                  )}>
-                    {org.role}
-                  </span>
-                </Link>
-              ))}
+              {organizations.map((org) => {
+                const topRole = org.memberRoles[0]?.role;
+                return (
+                  <Link
+                    key={org.id}
+                    href={`/dashboard/${org.tenant.subdomain}`}
+                    className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-md text-sm transition-colors hover:bg-accent hover:text-accent-foreground text-foreground"
+                  >
+                    <span className="truncate">{org.tenant.name}</span>
+                    {topRole && (
+                      <span
+                        className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none border"
+                        style={{
+                          backgroundColor: `${topRole.color}20`,
+                          color: topRole.color,
+                          borderColor: `${topRole.color}40`,
+                        }}
+                      >
+                        {topRole.name}
+                      </span>
+                    )}
+                  </Link>
+                )
+              })}
             </CollapsibleContent>
             <Link
               href="/organizer/register"

@@ -2,7 +2,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { TeamSection } from '@/components/dashboard/team/team-section';
-import type { TenantMemberRole } from '@/prisma/generated/prisma/client';
+import { getEffectivePermissions, hasPermission, PERMISSIONS } from '@/lib/permissions';
 
 async function getTeamData(userId: string, subdomain: string) {
   const tenant = await prisma.tenant.findUnique({
@@ -16,9 +16,26 @@ async function getTeamData(userId: string, subdomain: string) {
     where: {
       userId_tenantId: { userId, tenantId: tenant.id },
     },
+    include: {
+      memberRoles: {
+        include: {
+          role: {
+            select: {
+              permissions: true,
+              isOwnerRole: true,
+            },
+          },
+        },
+      },
+    },
   });
 
-  if (!membership || (membership.role !== 'OWNER' && membership.role !== 'ADMIN')) {
+  if (!membership) return null;
+
+  const roles = membership.memberRoles.map((mr) => mr.role);
+  const permissions = getEffectivePermissions(roles);
+
+  if (!hasPermission(permissions, [PERMISSIONS.VIEW_TEAM, PERMISSIONS.MANAGE_TEAM])) {
     return null;
   }
 
@@ -33,8 +50,25 @@ async function getTeamData(userId: string, subdomain: string) {
           email: true,
         },
       },
+      memberRoles: {
+        include: {
+          role: {
+            select: {
+              id: true,
+              name: true,
+              color: true,
+              permissions: true,
+              isOwnerRole: true,
+              position: true,
+            },
+          },
+        },
+        orderBy: {
+          role: { position: 'asc' },
+        },
+      },
     },
-    orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
+    orderBy: { createdAt: 'asc' },
   });
 
   const invitations = await prisma.tenantInvitation.findMany({
@@ -54,11 +88,34 @@ async function getTeamData(userId: string, subdomain: string) {
     orderBy: { createdAt: 'desc' },
   });
 
+  // Fetch role info for invitations
+  const allRoleIds = invitations.flatMap((i) => i.roleIds);
+  const allRoles = allRoleIds.length > 0
+    ? await prisma.tenantRole.findMany({
+        where: { id: { in: allRoleIds } },
+        select: { id: true, name: true, color: true },
+      })
+    : [];
+  const roleMap = new Map(allRoles.map((r) => [r.id, r]));
+
+  const enrichedInvitations = invitations.map((inv) => ({
+    ...inv,
+    roles: inv.roleIds.map((id) => roleMap.get(id)).filter(Boolean) as { id: string; name: string; color: string }[],
+  }));
+
+  // Fetch available roles for assignment
+  const tenantRoles = await prisma.tenantRole.findMany({
+    where: { tenantId: tenant.id, isOwnerRole: false },
+    orderBy: { position: 'asc' },
+    select: { id: true, name: true, color: true },
+  });
+
   return {
     tenant,
     members,
-    invitations,
-    currentUserRole: membership.role as TenantMemberRole,
+    invitations: enrichedInvitations,
+    permissions: Array.from(permissions),
+    tenantRoles,
   };
 }
 
@@ -98,8 +155,9 @@ export default async function TeamPage({
       <TeamSection
         members={data.members}
         invitations={data.invitations}
-        currentUserRole={data.currentUserRole}
+        permissions={data.permissions}
         subdomain={subdomain}
+        tenantRoles={data.tenantRoles}
       />
     </div>
   );

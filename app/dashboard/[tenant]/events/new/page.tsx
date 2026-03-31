@@ -1,8 +1,7 @@
 import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { EventForm } from '@/components/dashboard/events/event-form';
+import { CreateEventWizard } from '@/components/dashboard/events/create-event-wizard';
 import { createEventForTenantAction } from '@/app/actions/tenant-events';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
@@ -71,20 +70,10 @@ export default async function NewEventPage({
         </Link>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Create New Event</CardTitle>
-          <CardDescription>
-            Fill in the details below to create a new event for {tenant.name}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <EventForm
-            tenantSubdomain={subdomain}
-            onSubmit={handleSubmit}
-          />
-        </CardContent>
-      </Card>
+      <CreateEventWizard
+        tenantSubdomain={subdomain}
+        onCreateEvent={handleSubmit}
+      />
     </div>
   );
 }

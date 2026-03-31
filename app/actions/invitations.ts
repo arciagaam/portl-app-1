@@ -46,6 +46,12 @@ export async function getInvitationByTokenAction(token: string) {
       return { error: 'This invitation has expired' };
     }
 
+    // Fetch role names for the invitation
+    const roles = await prisma.tenantRole.findMany({
+      where: { id: { in: invitation.roleIds } },
+      select: { id: true, name: true, color: true },
+    });
+
     const inviterName = invitation.inviter.firstName && invitation.inviter.lastName
       ? `${invitation.inviter.firstName} ${invitation.inviter.lastName}`
       : invitation.inviter.email;
@@ -54,7 +60,7 @@ export async function getInvitationByTokenAction(token: string) {
       data: {
         id: invitation.id,
         email: invitation.email,
-        role: invitation.role,
+        roles,
         title: invitation.title,
         tenantName: invitation.tenant.name,
         tenantSubdomain: invitation.tenant.subdomain,
@@ -68,7 +74,7 @@ export async function getInvitationByTokenAction(token: string) {
 }
 
 /**
- * Accept an invitation and create TenantMember
+ * Accept an invitation and create TenantMember with assigned roles
  */
 export async function acceptInvitationAction(token: string) {
   try {
@@ -124,21 +130,41 @@ export async function acceptInvitationAction(token: string) {
       return { data: { subdomain: invitation.tenant.subdomain, alreadyMember: true } };
     }
 
-    // Create membership and mark invitation as accepted in a transaction
-    await prisma.$transaction([
-      prisma.tenantMember.create({
+    // Verify roleIds exist and belong to this tenant
+    const validRoles = await prisma.tenantRole.findMany({
+      where: {
+        id: { in: invitation.roleIds },
+        tenantId: invitation.tenantId,
+        isOwnerRole: false,
+      },
+      select: { id: true },
+    });
+
+    // Create membership, assign roles, and mark invitation as accepted
+    await prisma.$transaction(async (tx) => {
+      const member = await tx.tenantMember.create({
         data: {
           userId: user.id,
           tenantId: invitation.tenantId,
-          role: invitation.role,
           title: invitation.title,
         },
-      }),
-      prisma.tenantInvitation.update({
+      });
+
+      // Create role assignments
+      if (validRoles.length > 0) {
+        await tx.memberRole.createMany({
+          data: validRoles.map((role) => ({
+            tenantMemberId: member.id,
+            tenantRoleId: role.id,
+          })),
+        });
+      }
+
+      await tx.tenantInvitation.update({
         where: { id: invitation.id },
         data: { status: 'ACCEPTED' },
-      }),
-    ]);
+      });
+    });
 
     revalidatePath('/account');
     return { data: { subdomain: invitation.tenant.subdomain } };

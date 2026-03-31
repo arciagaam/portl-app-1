@@ -3,6 +3,12 @@ import type { NextConfig } from "next";
 const rootDomain = process.env.VERCEL_ENV ? `${process.env.VERCEL_URL || process.env.VERCEL_BRANCH_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'localhost';
 
 const nextConfig: NextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
+  },
+  allowedDevOrigins: ['localhost', 'lvh.me', '*.lvh.me'],
   images: {
     remotePatterns: [
       {

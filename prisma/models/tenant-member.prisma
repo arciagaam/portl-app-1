@@ -1,26 +1,19 @@
 model TenantMember {
-  id                  String           @id @default(cuid())
+  id                  String       @id @default(cuid())
   userId              String
   tenantId            String
-  role                TenantMemberRole @default(MEMBER)
   title               String?
-  userShowInProfile   Boolean          @default(true)
-  tenantShowInProfile Boolean          @default(true)
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  userShowInProfile   Boolean      @default(true)
+  tenantShowInProfile Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberRoles MemberRole[]
 
   @@unique([userId, tenantId])
   @@index([userId])
   @@index([tenantId])
   @@map("tenant_members")
-}
-
-enum TenantMemberRole {
-  OWNER
-  ADMIN
-  MANAGER
-  MEMBER
 }

@@ -1,10 +1,11 @@
 'use server';
 
-import { requireTenantOwner, requireTenantAccess } from '@/lib/tenant';
+import { requireTenantAccess } from '@/lib/tenant';
+import { PERMISSIONS } from '@/lib/permissions';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { del } from '@vercel/blob';
-import type { EventFormData, TableFormData, BulkTableFormData, TicketTypeFormData, PriceTierFormData, PromotionFormData, VoucherCodeFormData } from '@/lib/validations/events';
+import type { EventFormData, TableFormData, BulkTableFormData, TicketTypeFormData, PriceTierFormData, PromotionFormData, VoucherCodeFormData, EventPromoterFormData } from '@/lib/validations/events';
 import * as helpers from '@/lib/event-helpers';
 import { handleActionError } from '@/lib/action-utils';
 
@@ -35,7 +36,7 @@ async function verifyEventBelongsToTenant(eventId: string, tenantId: string) {
  */
 export async function getEventsForTenantAction(tenantSubdomain: string) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.VIEW_EVENTS);
 
     const events = await prisma.event.findMany({
       where: { tenantId: tenant.id },
@@ -66,7 +67,7 @@ export async function getEventsForTenantAction(tenantSubdomain: string) {
  */
 export async function getEventByIdForTenantAction(tenantSubdomain: string, eventId: string) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.VIEW_EVENTS);
 
     const event = await prisma.event.findUnique({
       where: { id: eventId },
@@ -77,6 +78,15 @@ export async function getEventByIdForTenantAction(tenantSubdomain: string, event
         tables: {
           include: {
             seats: true,
+            ticketTypes: {
+              select: {
+                id: true,
+                name: true,
+                quantityTotal: true,
+                quantitySold: true,
+                status: true,
+              },
+            },
             _count: {
               select: {
                 ticketTypes: true,
@@ -136,7 +146,7 @@ export async function getEventByIdForTenantAction(tenantSubdomain: string, event
  */
 export async function createEventForTenantAction(tenantSubdomain: string, data: EventFormData) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
 
     // Convert date strings to Date objects for storage
     const startDate = new Date(data.startDate);
@@ -178,7 +188,7 @@ export async function createEventForTenantAction(tenantSubdomain: string, data: 
  */
 export async function updateEventForTenantAction(tenantSubdomain: string, eventId: string, data: EventFormData) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
 
     // Convert date strings to Date objects for storage
     const startDate = new Date(data.startDate);
@@ -223,7 +233,7 @@ export async function updateEventForTenantAction(tenantSubdomain: string, eventI
  */
 export async function archiveEventForTenantAction(tenantSubdomain: string, eventId: string) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
 
     const event = await prisma.event.update({
       where: { id: eventId, tenantId: tenant.id },
@@ -248,7 +258,7 @@ export async function archiveEventForTenantAction(tenantSubdomain: string, event
  */
 export async function publishEventForTenantAction(tenantSubdomain: string, eventId: string) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.PUBLISH_EVENTS);
 
     const event = await prisma.event.update({
       where: { id: eventId, tenantId: tenant.id },
@@ -274,7 +284,7 @@ export async function publishEventForTenantAction(tenantSubdomain: string, event
 
 export async function createTableForTenantAction(tenantSubdomain: string, eventId: string, data: TableFormData) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     await verifyEventBelongsToTenant(eventId, tenant.id);
     const result = await helpers.createTable(eventId, data);
     revalidatePath(`/dashboard/${tenantSubdomain}/events/${eventId}`);
@@ -288,7 +298,7 @@ export async function createTableForTenantAction(tenantSubdomain: string, eventI
 
 export async function bulkCreateTablesForTenantAction(tenantSubdomain: string, eventId: string, data: BulkTableFormData) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     await verifyEventBelongsToTenant(eventId, tenant.id);
     const result = await helpers.bulkCreateTables(eventId, data);
     revalidatePath(`/dashboard/${tenantSubdomain}/events/${eventId}`);
@@ -300,7 +310,7 @@ export async function bulkCreateTablesForTenantAction(tenantSubdomain: string, e
 
 export async function updateTableCapacityForTenantAction(tenantSubdomain: string, tableId: string, newCapacity: number) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     const table = await prisma.table.findUnique({ where: { id: tableId }, include: { event: true } });
     if (!table) return { error: 'Table not found' };
     await verifyEventBelongsToTenant(table.eventId, tenant.id);
@@ -314,7 +324,7 @@ export async function updateTableCapacityForTenantAction(tenantSubdomain: string
 
 export async function regenerateSeatsForTenantAction(tenantSubdomain: string, tableId: string) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     const table = await prisma.table.findUnique({ where: { id: tableId }, include: { event: true } });
     if (!table) return { error: 'Table not found' };
     await verifyEventBelongsToTenant(table.eventId, tenant.id);
@@ -328,7 +338,7 @@ export async function regenerateSeatsForTenantAction(tenantSubdomain: string, ta
 
 export async function updateTableForTenantAction(tenantSubdomain: string, tableId: string, data: TableFormData) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     const table = await prisma.table.findUnique({ where: { id: tableId }, include: { event: true } });
     if (!table) return { error: 'Table not found' };
     await verifyEventBelongsToTenant(table.eventId, tenant.id);
@@ -340,9 +350,23 @@ export async function updateTableForTenantAction(tenantSubdomain: string, tableI
   }
 }
 
+export async function updateTableStatusForTenantAction(tenantSubdomain: string, tableId: string, status: 'OPEN' | 'CLOSED' | 'HIDDEN') {
+  try {
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
+    const table = await prisma.table.findUnique({ where: { id: tableId }, include: { event: true } });
+    if (!table) return { error: 'Table not found' };
+    await verifyEventBelongsToTenant(table.eventId, tenant.id);
+    const result = await helpers.updateTableStatus(tableId, status);
+    revalidatePath(`/dashboard/${tenantSubdomain}/events/${table.eventId}`);
+    return { data: result };
+  } catch (error) {
+    return handleActionError(error, 'Failed to update table status');
+  }
+}
+
 export async function deleteTableForTenantAction(tenantSubdomain: string, tableId: string) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     const existingTable = await prisma.table.findUnique({ where: { id: tableId }, include: { event: true } });
     if (!existingTable) return { error: 'Table not found' };
     await verifyEventBelongsToTenant(existingTable.eventId, tenant.id);
@@ -360,7 +384,7 @@ export async function deleteTableForTenantAction(tenantSubdomain: string, tableI
 
 export async function getTicketTypesByEventForTenantAction(tenantSubdomain: string, eventId: string) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.VIEW_EVENTS);
     await verifyEventBelongsToTenant(eventId, tenant.id);
     const ticketTypes = await prisma.ticketType.findMany({
       where: { eventId },
@@ -378,7 +402,7 @@ export async function getTicketTypesByEventForTenantAction(tenantSubdomain: stri
 
 export async function createTicketTypeForTenantAction(tenantSubdomain: string, eventId: string, data: TicketTypeFormData) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     await verifyEventBelongsToTenant(eventId, tenant.id);
     const ticketType = await helpers.createTicketType(eventId, data);
     revalidatePath(`/dashboard/${tenantSubdomain}/events/${eventId}`);
@@ -390,7 +414,7 @@ export async function createTicketTypeForTenantAction(tenantSubdomain: string, e
 
 export async function updateTicketTypeForTenantAction(tenantSubdomain: string, ticketTypeId: string, data: TicketTypeFormData) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     const existingTicketType = await prisma.ticketType.findUnique({ where: { id: ticketTypeId } });
     if (!existingTicketType) return { error: 'Ticket type not found' };
     await verifyEventBelongsToTenant(existingTicketType.eventId, tenant.id);
@@ -402,9 +426,24 @@ export async function updateTicketTypeForTenantAction(tenantSubdomain: string, t
   }
 }
 
+export async function updateTicketTypeStatusForTenantAction(tenantSubdomain: string, ticketTypeId: string, status: 'OPEN' | 'CLOSED' | 'HIDDEN') {
+  try {
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
+    const existing = await prisma.ticketType.findUnique({ where: { id: ticketTypeId } });
+    if (!existing) return { error: 'Ticket type not found' };
+    await verifyEventBelongsToTenant(existing.eventId, tenant.id);
+    const result = await helpers.updateTicketTypeStatus(ticketTypeId, status);
+    revalidatePath(`/dashboard/${tenantSubdomain}/events/${existing.eventId}`);
+    revalidatePath(`/t/${tenantSubdomain}/events/${existing.eventId}`);
+    return { data: result };
+  } catch (error) {
+    return handleActionError(error, 'Failed to update ticket type status');
+  }
+}
+
 export async function deleteTicketTypeForTenantAction(tenantSubdomain: string, ticketTypeId: string) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     const existing = await prisma.ticketType.findUnique({ where: { id: ticketTypeId } });
     if (!existing) return { error: 'Ticket type not found' };
     await verifyEventBelongsToTenant(existing.eventId, tenant.id);
@@ -422,7 +461,7 @@ export async function deleteTicketTypeForTenantAction(tenantSubdomain: string, t
 
 export async function createPriceTierForTenantAction(tenantSubdomain: string, ticketTypeId: string, data: PriceTierFormData) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     const ticketType = await prisma.ticketType.findUnique({ where: { id: ticketTypeId } });
     if (!ticketType) return { error: 'Ticket type not found' };
     await verifyEventBelongsToTenant(ticketType.eventId, tenant.id);
@@ -436,7 +475,7 @@ export async function createPriceTierForTenantAction(tenantSubdomain: string, ti
 
 export async function updatePriceTierForTenantAction(tenantSubdomain: string, priceTierId: string, data: PriceTierFormData) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     const priceTier = await prisma.ticketTypePriceTier.findUnique({
       where: { id: priceTierId },
       include: { ticketType: true },
@@ -453,7 +492,7 @@ export async function updatePriceTierForTenantAction(tenantSubdomain: string, pr
 
 export async function deletePriceTierForTenantAction(tenantSubdomain: string, priceTierId: string) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     const priceTier = await prisma.ticketTypePriceTier.findUnique({
       where: { id: priceTierId },
       include: { ticketType: true },
@@ -474,7 +513,7 @@ export async function deletePriceTierForTenantAction(tenantSubdomain: string, pr
 
 export async function createPromotionForTenantAction(tenantSubdomain: string, eventId: string, data: PromotionFormData) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     await verifyEventBelongsToTenant(eventId, tenant.id);
     const result = await helpers.createPromotion(eventId, data);
     revalidatePath(`/dashboard/${tenantSubdomain}/events/${eventId}`);
@@ -486,7 +525,7 @@ export async function createPromotionForTenantAction(tenantSubdomain: string, ev
 
 export async function updatePromotionForTenantAction(tenantSubdomain: string, promotionId: string, data: PromotionFormData) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     const existingPromotion = await prisma.promotion.findUnique({ where: { id: promotionId } });
     if (!existingPromotion) return { error: 'Promotion not found' };
     await verifyEventBelongsToTenant(existingPromotion.eventId, tenant.id);
@@ -500,7 +539,7 @@ export async function updatePromotionForTenantAction(tenantSubdomain: string, pr
 
 export async function deletePromotionForTenantAction(tenantSubdomain: string, promotionId: string) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     const promotion = await prisma.promotion.findUnique({ where: { id: promotionId } });
     if (!promotion) return { error: 'Promotion not found' };
     await verifyEventBelongsToTenant(promotion.eventId, tenant.id);
@@ -518,7 +557,7 @@ export async function deletePromotionForTenantAction(tenantSubdomain: string, pr
 
 export async function createVoucherCodeForTenantAction(tenantSubdomain: string, promotionId: string, data: VoucherCodeFormData) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     const promotion = await prisma.promotion.findUnique({ where: { id: promotionId } });
     if (!promotion) return { error: 'Promotion not found' };
     await verifyEventBelongsToTenant(promotion.eventId, tenant.id);
@@ -534,7 +573,7 @@ export async function createVoucherCodeForTenantAction(tenantSubdomain: string, 
 
 export async function updateVoucherCodeForTenantAction(tenantSubdomain: string, voucherCodeId: string, data: VoucherCodeFormData) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     const voucherCode = await prisma.voucherCode.findUnique({
       where: { id: voucherCodeId },
       include: { promotion: true },
@@ -553,7 +592,7 @@ export async function updateVoucherCodeForTenantAction(tenantSubdomain: string, 
 
 export async function deleteVoucherCodeForTenantAction(tenantSubdomain: string, voucherCodeId: string) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     const voucherCode = await prisma.voucherCode.findUnique({
       where: { id: voucherCodeId },
       include: { promotion: true },
@@ -583,7 +622,7 @@ export async function addEventImageAction(tenantSubdomain: string, eventId: stri
       return { error: 'Invalid URL' };
     }
 
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     await verifyEventBelongsToTenant(eventId, tenant.id);
 
     const count = await prisma.eventImage.count({ where: { eventId } });
@@ -611,7 +650,7 @@ export async function addEventImageAction(tenantSubdomain: string, eventId: stri
  */
 export async function deleteEventImageAction(tenantSubdomain: string, imageId: string) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
 
     const image = await prisma.eventImage.findUnique({
       where: { id: imageId },
@@ -660,7 +699,7 @@ export async function deleteEventImageAction(tenantSubdomain: string, imageId: s
  */
 export async function reorderEventImagesAction(tenantSubdomain: string, eventId: string, imageIds: string[]) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     await verifyEventBelongsToTenant(eventId, tenant.id);
 
     // Verify all images belong to this event
@@ -697,7 +736,7 @@ export async function reorderEventImagesAction(tenantSubdomain: string, eventId:
  */
 export async function setEventThumbnailAction(tenantSubdomain: string, eventId: string, thumbnailUrl: string | null) {
   try {
-    const { tenant } = await requireTenantOwner(tenantSubdomain);
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
     await verifyEventBelongsToTenant(eventId, tenant.id);
 
     const event = await prisma.event.update({
@@ -721,7 +760,7 @@ export async function setEventThumbnailAction(tenantSubdomain: string, eventId: 
  */
 export async function getAttendeesForEventAction(tenantSubdomain: string, eventId: string) {
   try {
-    const { tenant } = await requireTenantAccess(tenantSubdomain, 'MANAGER');
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.CHECK_IN_GUESTS);
 
     await verifyEventBelongsToTenant(eventId, tenant.id);
 
@@ -763,7 +802,7 @@ export async function getAttendeesForEventAction(tenantSubdomain: string, eventI
  */
 export async function checkInTicketAction(tenantSubdomain: string, ticketCode: string) {
   try {
-    const { tenant } = await requireTenantAccess(tenantSubdomain, 'MANAGER');
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.CHECK_IN_GUESTS);
 
     const ticket = await prisma.ticket.findUnique({
       where: { ticketCode },
@@ -822,7 +861,7 @@ export async function checkInTicketAction(tenantSubdomain: string, ticketCode: s
  */
 export async function undoCheckInAction(tenantSubdomain: string, ticketId: string) {
   try {
-    const { tenant } = await requireTenantAccess(tenantSubdomain, 'ADMIN');
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
 
     const ticket = await prisma.ticket.findUnique({
       where: { id: ticketId },
@@ -868,7 +907,7 @@ export async function undoCheckInAction(tenantSubdomain: string, ticketId: strin
  */
 export async function getOrdersForEventAction(tenantSubdomain: string, eventId: string) {
   try {
-    const { tenant } = await requireTenantAccess(tenantSubdomain, 'MANAGER');
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.VIEW_ORDERS);
 
     await verifyEventBelongsToTenant(eventId, tenant.id);
 
@@ -915,5 +954,75 @@ export async function getOrdersForEventAction(tenantSubdomain: string, eventId: 
     };
   } catch (error) {
     return handleActionError(error, 'Failed to fetch orders');
+  }
+}
+
+// ============================================================================
+// EVENT PROMOTERS
+// ============================================================================
+
+export async function getEventPromotersAction(tenantSubdomain: string, eventId: string) {
+  try {
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_PROMOTIONS);
+    await verifyEventBelongsToTenant(eventId, tenant.id);
+    const result = await helpers.getPromoterPerformance(eventId);
+    return { data: result };
+  } catch (error) {
+    return handleActionError(error, 'Failed to fetch promoters');
+  }
+}
+
+export async function createEventPromoterAction(tenantSubdomain: string, eventId: string, data: EventPromoterFormData) {
+  try {
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_PROMOTIONS);
+    await verifyEventBelongsToTenant(eventId, tenant.id);
+
+    // Verify promotion belongs to this event
+    const promotion = await prisma.promotion.findUnique({ where: { id: data.promotionId } });
+    if (!promotion || promotion.eventId !== eventId) {
+      return { error: 'Invalid promotion for this event' };
+    }
+
+    const result = await helpers.createEventPromoter(eventId, data);
+    revalidatePath(`/dashboard/${tenantSubdomain}/events/${eventId}`);
+    return { data: result };
+  } catch (error) {
+    return handleActionError(error, 'Failed to create promoter', {
+      'Unique constraint': 'A promoter with this email already exists for this event, or this promo code is already taken',
+    });
+  }
+}
+
+export async function updateEventPromoterAction(
+  tenantSubdomain: string,
+  promoterId: string,
+  data: { name?: string; email?: string; phone?: string; commissionRate?: number | null; notes?: string | null },
+) {
+  try {
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_PROMOTIONS);
+    const promoter = await prisma.eventPromoter.findUnique({ where: { id: promoterId } });
+    if (!promoter) return { error: 'Promoter not found' };
+    await verifyEventBelongsToTenant(promoter.eventId, tenant.id);
+    const result = await helpers.updateEventPromoter(promoterId, data);
+    revalidatePath(`/dashboard/${tenantSubdomain}/events/${promoter.eventId}`);
+    return { data: result };
+  } catch (error) {
+    return handleActionError(error, 'Failed to update promoter', {
+      'Unique constraint': 'A promoter with this email already exists for this event',
+    });
+  }
+}
+
+export async function deleteEventPromoterAction(tenantSubdomain: string, promoterId: string) {
+  try {
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_PROMOTIONS);
+    const promoter = await prisma.eventPromoter.findUnique({ where: { id: promoterId } });
+    if (!promoter) return { error: 'Promoter not found' };
+    await verifyEventBelongsToTenant(promoter.eventId, tenant.id);
+    await helpers.deleteEventPromoter(promoterId);
+    revalidatePath(`/dashboard/${tenantSubdomain}/events/${promoter.eventId}`);
+    return { success: true };
+  } catch (error) {
+    return handleActionError(error, 'Failed to delete promoter');
   }
 }

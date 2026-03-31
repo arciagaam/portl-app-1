@@ -24,7 +24,7 @@ export function VenuesForm({ initialData, onChange }: VenuesFormProps) {
   const [venues, setVenues] = useState<Venue[]>(
     initialData && initialData.length > 0
       ? initialData
-      : [{ name: '', relationship: 'renter', images: [] }]
+      : []
   );
 
   const updateVenue = (index: number, field: keyof Venue, value: string | (string | File)[]) => {
@@ -42,7 +42,6 @@ export function VenuesForm({ initialData, onChange }: VenuesFormProps) {
   };
 
   const removeVenue = (index: number) => {
-    if (venues.length <= 1) return;
     const newVenues = venues.filter((_, i) => i !== index);
     setVenues(newVenues);
     onChange(newVenues);
@@ -73,15 +72,13 @@ export function VenuesForm({ initialData, onChange }: VenuesFormProps) {
           <CardContent className="pt-6 space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-medium">Venue {venueIndex + 1}</h3>
-              {venues.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeVenue(venueIndex)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => removeVenue(venueIndex)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
 
             <div className="space-y-2">

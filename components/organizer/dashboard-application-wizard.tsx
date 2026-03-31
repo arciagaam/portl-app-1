@@ -14,6 +14,7 @@ import { AgreementsForm, type AgreementsData } from '@/components/organizer/agre
 import { ReviewForm } from '@/components/organizer/review-form';
 import { ArrowLeft, Lock } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { saveApplicationAction } from '@/app/actions/organizer';
 import { OrganizerApplication } from '@/prisma/generated/prisma/client';
 
@@ -46,7 +47,7 @@ export function DashboardApplicationWizard({
 
     if (result.error || !result.data) {
       console.error('Error saving application:', result.error);
-      alert(result.error || 'Failed to save application. Please try again.');
+      toast.error(result.error || 'Failed to save application. Please try again.');
       return;
     }
 

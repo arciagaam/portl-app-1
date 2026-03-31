@@ -2,7 +2,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import TenantSidebar from '@/components/dashboard/tenant-sidebar'
-import type { TenantMemberRole } from '@/prisma/generated/prisma/client'
+import { getEffectivePermissions } from '@/lib/permissions'
 
 async function getTenantInfo(userId: string, subdomain: string) {
   const tenant = await prisma.tenant.findUnique({
@@ -18,13 +18,28 @@ async function getTenantInfo(userId: string, subdomain: string) {
     where: {
       userId_tenantId: { userId, tenantId: tenant.id },
     },
+    include: {
+      memberRoles: {
+        include: {
+          role: {
+            select: {
+              permissions: true,
+              isOwnerRole: true,
+            },
+          },
+        },
+      },
+    },
   })
 
   if (!membership) {
     return null
   }
 
-  return { tenant, memberRole: membership.role }
+  const roles = membership.memberRoles.map((mr) => mr.role)
+  const permissions = getEffectivePermissions(roles)
+
+  return { tenant, permissions: Array.from(permissions) }
 }
 
 export default async function TenantDashboardLayout({
@@ -47,7 +62,7 @@ export default async function TenantDashboardLayout({
     redirect('/account')
   }
 
-  const { tenant, memberRole } = result
+  const { tenant, permissions } = result
   const isApproved = tenant.application?.status === 'APPROVED'
 
   return (
@@ -56,7 +71,7 @@ export default async function TenantDashboardLayout({
         <TenantSidebar
           tenantSubdomain={subdomain}
           isApproved={isApproved}
-          memberRole={memberRole}
+          permissions={permissions}
           userName={user.name}
           userEmail={user.email}
         />

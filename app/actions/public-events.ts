@@ -23,6 +23,9 @@ export async function getPublicEventsForTenant(subdomain: string) {
       },
       include: {
         ticketTypes: {
+          where: {
+            status: { not: 'HIDDEN' },
+          },
           select: {
             id: true,
             basePrice: true,
@@ -64,6 +67,9 @@ export async function getPublicEventById(subdomain: string, eventId: string) {
           orderBy: { position: 'asc' },
         },
         ticketTypes: {
+          where: {
+            status: { not: 'HIDDEN' },
+          },
           include: {
             priceTiers: {
               orderBy: {

@@ -2,19 +2,19 @@
 
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { requireTenantAccess, hasMinimumRole } from '@/lib/tenant';
+import { requireTenantAccess } from '@/lib/tenant';
 import { getCurrentUser } from '@/lib/auth';
 import { sendInvitationEmail } from '@/lib/email';
 import { mainUrl } from '@/lib/url';
 import { inviteMemberSchema, updateMemberSchema } from '@/lib/validations/team';
-import type { TenantMemberRole } from '@/prisma/generated/prisma/client';
+import { PERMISSIONS, isOwner as checkIsOwner } from '@/lib/permissions';
 
 /**
  * Get team members for a tenant
  */
 export async function getTeamMembersAction(subdomain: string) {
   try {
-    const { tenant } = await requireTenantAccess(subdomain, 'MANAGER');
+    const { tenant } = await requireTenantAccess(subdomain, PERMISSIONS.VIEW_TEAM);
 
     const members = await prisma.tenantMember.findMany({
       where: { tenantId: tenant.id },
@@ -27,11 +27,25 @@ export async function getTeamMembersAction(subdomain: string) {
             email: true,
           },
         },
+        memberRoles: {
+          include: {
+            role: {
+              select: {
+                id: true,
+                name: true,
+                color: true,
+                permissions: true,
+                isOwnerRole: true,
+                position: true,
+              },
+            },
+          },
+          orderBy: {
+            role: { position: 'asc' },
+          },
+        },
       },
-      orderBy: [
-        { role: 'asc' },
-        { createdAt: 'asc' },
-      ],
+      orderBy: { createdAt: 'asc' },
     });
 
     return { data: members };
@@ -46,17 +60,30 @@ export async function getTeamMembersAction(subdomain: string) {
  */
 export async function inviteTeamMemberAction(
   subdomain: string,
-  data: { email: string; role: string; title?: string }
+  data: { email: string; roleIds: string[]; title?: string }
 ) {
   try {
-    const { tenant, user } = await requireTenantAccess(subdomain, 'ADMIN');
+    const { tenant, user } = await requireTenantAccess(subdomain, PERMISSIONS.MANAGE_TEAM);
 
     const parsed = inviteMemberSchema.safeParse(data);
     if (!parsed.success) {
       return { error: parsed.error.issues[0].message };
     }
 
-    const { email, role, title } = parsed.data;
+    const { email, roleIds, title } = parsed.data;
+
+    // Verify all roleIds belong to this tenant and none are the owner role
+    const roles = await prisma.tenantRole.findMany({
+      where: { id: { in: roleIds }, tenantId: tenant.id },
+    });
+
+    if (roles.length !== roleIds.length) {
+      return { error: 'One or more selected roles are invalid' };
+    }
+
+    if (roles.some((r) => r.isOwnerRole)) {
+      return { error: 'Cannot invite with Owner role' };
+    }
 
     // Check if user is already a member
     const existingUser = await prisma.user.findUnique({
@@ -104,7 +131,7 @@ export async function inviteTeamMemberAction(
         },
       },
       update: {
-        role: role as TenantMemberRole,
+        roleIds,
         title,
         status: 'PENDING',
         invitedBy: user.id,
@@ -114,14 +141,17 @@ export async function inviteTeamMemberAction(
       create: {
         tenantId: tenant.id,
         email,
-        role: role as TenantMemberRole,
+        roleIds,
         title,
         invitedBy: user.id,
         expiresAt,
       },
     });
 
-    // Fetch fresh user data for the inviter name (JWT may have stale name)
+    // Fetch role names for email
+    const roleNames = roles.map((r) => r.name).join(', ');
+
+    // Fetch fresh user data for the inviter name
     const dbUser = await prisma.user.findUnique({
       where: { id: user.id },
       select: { firstName: true, lastName: true, email: true },
@@ -135,7 +165,7 @@ export async function inviteTeamMemberAction(
       to: email,
       inviterName,
       tenantName: tenant.name,
-      role,
+      role: roleNames,
       inviteUrl,
     });
 
@@ -148,15 +178,15 @@ export async function inviteTeamMemberAction(
 }
 
 /**
- * Update a team member's role, title, or visibility
+ * Update a team member's title or visibility
  */
 export async function updateTeamMemberAction(
   subdomain: string,
   memberId: string,
-  data: { role?: string; title?: string | null; tenantShowInProfile?: boolean }
+  data: { title?: string | null; tenantShowInProfile?: boolean }
 ) {
   try {
-    const { tenant, membership } = await requireTenantAccess(subdomain, 'ADMIN');
+    const { tenant } = await requireTenantAccess(subdomain, PERMISSIONS.MANAGE_TEAM);
 
     const parsed = updateMemberSchema.safeParse(data);
     if (!parsed.success) {
@@ -171,19 +201,7 @@ export async function updateTeamMemberAction(
       return { error: 'Member not found' };
     }
 
-    // Role changes require OWNER
-    if (parsed.data.role && parsed.data.role !== target.role) {
-      if (membership.role !== 'OWNER') {
-        return { error: 'Only the owner can change roles' };
-      }
-      // Cannot demote self
-      if (target.userId === membership.userId) {
-        return { error: 'Cannot change your own role' };
-      }
-    }
-
-    const updateData: Partial<{ role: TenantMemberRole; title: string | null; tenantShowInProfile: boolean }> = {};
-    if (parsed.data.role) updateData.role = parsed.data.role;
+    const updateData: Partial<{ title: string | null; tenantShowInProfile: boolean }> = {};
     if (parsed.data.title !== undefined) updateData.title = parsed.data.title;
     if (parsed.data.tenantShowInProfile !== undefined) {
       updateData.tenantShowInProfile = parsed.data.tenantShowInProfile;
@@ -210,10 +228,15 @@ export async function removeTeamMemberAction(
   memberId: string
 ) {
   try {
-    const { tenant, membership } = await requireTenantAccess(subdomain, 'ADMIN');
+    const { tenant, membership } = await requireTenantAccess(subdomain, PERMISSIONS.MANAGE_TEAM);
 
     const target = await prisma.tenantMember.findUnique({
       where: { id: memberId },
+      include: {
+        memberRoles: {
+          include: { role: { select: { permissions: true, isOwnerRole: true } } },
+        },
+      },
     });
 
     if (!target || target.tenantId !== tenant.id) {
@@ -225,14 +248,10 @@ export async function removeTeamMemberAction(
       return { error: 'Cannot remove yourself from the team' };
     }
 
-    // Cannot remove OWNER
-    if (target.role === 'OWNER') {
+    // Cannot remove member with Owner role
+    const targetIsOwner = checkIsOwner(target.memberRoles.map((mr) => mr.role));
+    if (targetIsOwner) {
       return { error: 'Cannot remove the owner' };
-    }
-
-    // ADMIN can only remove MANAGER and MEMBER (not other ADMINs)
-    if (membership.role === 'ADMIN' && hasMinimumRole(target.role, 'ADMIN')) {
-      return { error: 'Insufficient permissions to remove this member' };
     }
 
     await prisma.tenantMember.delete({
@@ -286,7 +305,7 @@ export async function toggleMemberProfileVisibilityAction(
  */
 export async function getPendingInvitationsAction(subdomain: string) {
   try {
-    const { tenant } = await requireTenantAccess(subdomain, 'ADMIN');
+    const { tenant } = await requireTenantAccess(subdomain, PERMISSIONS.MANAGE_TEAM);
 
     const invitations = await prisma.tenantInvitation.findMany({
       where: {
@@ -306,7 +325,20 @@ export async function getPendingInvitationsAction(subdomain: string) {
       orderBy: { createdAt: 'desc' },
     });
 
-    return { data: invitations };
+    // Fetch role names for each invitation
+    const allRoleIds = invitations.flatMap((i) => i.roleIds);
+    const roles = await prisma.tenantRole.findMany({
+      where: { id: { in: allRoleIds } },
+      select: { id: true, name: true, color: true },
+    });
+    const roleMap = new Map(roles.map((r) => [r.id, r]));
+
+    const enriched = invitations.map((inv) => ({
+      ...inv,
+      roles: inv.roleIds.map((id) => roleMap.get(id)).filter(Boolean),
+    }));
+
+    return { data: enriched };
   } catch (error) {
     console.error('Error fetching invitations:', error);
     return { error: 'Failed to fetch invitations' };
@@ -321,7 +353,7 @@ export async function revokeInvitationAction(
   invitationId: string
 ) {
   try {
-    const { tenant } = await requireTenantAccess(subdomain, 'ADMIN');
+    const { tenant } = await requireTenantAccess(subdomain, PERMISSIONS.MANAGE_TEAM);
 
     const invitation = await prisma.tenantInvitation.findUnique({
       where: { id: invitationId },

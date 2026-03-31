@@ -27,7 +27,7 @@ export function PastEventsForm({ initialData, onChange }: PastEventsFormProps) {
   const [events, setEvents] = useState<PastEvent[]>(
     initialData && initialData.length > 0
       ? initialData
-      : [{ name: '', date: '', photos: [], videoLinks: [], estimatedAttendance: '', pressCoverage: '' }]
+      : []
   );
 
   const updateEvent = (index: number, field: keyof PastEvent, value: string | (string | File)[]) => {
@@ -45,7 +45,6 @@ export function PastEventsForm({ initialData, onChange }: PastEventsFormProps) {
   };
 
   const removeEvent = (index: number) => {
-    if (events.length <= 1) return;
     const newEvents = events.filter((_, i) => i !== index);
     setEvents(newEvents);
     onChange(newEvents);
@@ -89,15 +88,13 @@ export function PastEventsForm({ initialData, onChange }: PastEventsFormProps) {
           <CardContent className="pt-6 space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-medium">Past Event {eventIndex + 1}</h3>
-              {events.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeEvent(eventIndex)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => removeEvent(eventIndex)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
 
             <div className="space-y-2">

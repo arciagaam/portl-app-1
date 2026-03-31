@@ -7,7 +7,7 @@ import { EventStatsCards } from '@/components/dashboard/events/event-stats-cards
 import { EventSubNav } from '@/components/dashboard/events/event-sub-nav';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, MapPin, Clock, Info, ImageIcon, UserCheck } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Clock, Info, ImageIcon, UserCheck, Megaphone } from 'lucide-react';
 import { QuickCheckIn } from '@/components/dashboard/events/quick-check-in';
 
 export default async function EventDetailPage({
@@ -30,13 +30,16 @@ export default async function EventDetailPage({
 
   const event = result.data;
 
-  // Get order and attendee counts for sub-nav
-  const [orderCount, attendeeCount] = await Promise.all([
+  // Get order, attendee, and promoter counts for sub-nav
+  const [orderCount, attendeeCount, promoterCount] = await Promise.all([
     prisma.order.count({
       where: { eventId, tenantId: event.tenantId, status: 'CONFIRMED' },
     }),
     prisma.ticket.count({
       where: { eventId, order: { status: 'CONFIRMED' } },
+    }),
+    prisma.eventPromoter.count({
+      where: { eventId },
     }),
   ]);
 
@@ -73,6 +76,7 @@ export default async function EventDetailPage({
           tables: event.tables.length,
           ticketTypes: event.ticketTypes.length,
           promotions: event.promotions.length,
+          promoters: promoterCount,
           images: event.images.length,
           orders: orderCount,
           attendees: attendeeCount,
@@ -257,6 +261,21 @@ export default async function EventDetailPage({
                 <h4 className="font-medium">Promotions</h4>
                 <p className="text-sm text-muted-foreground">
                   {event.promotions.length} promotion{event.promotions.length !== 1 ? 's' : ''} active
+                </p>
+              </div>
+            </Link>
+
+            <Link
+              href={`/dashboard/${subdomain}/events/${eventId}/promoters`}
+              className="flex items-center gap-3 p-4 border rounded-lg hover:bg-accent transition-colors"
+            >
+              <div className="p-2 rounded-full bg-primary/10">
+                <Megaphone className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h4 className="font-medium">Promoters</h4>
+                <p className="text-sm text-muted-foreground">
+                  {promoterCount} promoter{promoterCount !== 1 ? 's' : ''} assigned
                 </p>
               </div>
             </Link>

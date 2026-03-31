@@ -1,13 +1,14 @@
 model Table {
-  id        String    @id @default(cuid())
+  id        String          @id @default(cuid())
   eventId   String
-  label     String    // e.g., "A1", "B2"
+  label     String          // e.g., "A1", "B2"
   capacity  Int
-  minSpend  Int?      // Optional minimum spend in PHP
-  notes     String?   @db.Text
-  mode      TableMode @default(EXCLUSIVE)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  minSpend  Int?            // Optional minimum spend in PHP
+  notes     String?         @db.Text
+  mode      TableMode       @default(EXCLUSIVE)
+  status    InventoryStatus @default(OPEN)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 
   event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
   seats       Seat[]
@@ -16,6 +17,7 @@ model Table {
   @@unique([eventId, label])
   @@index([eventId])
   @@index([mode])
+  @@index([status])
   @@map("tables")
 }
 

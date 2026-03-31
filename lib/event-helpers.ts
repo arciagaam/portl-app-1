@@ -16,6 +16,7 @@ import type {
   PriceTierFormData,
   PromotionFormData,
   VoucherCodeFormData,
+  EventPromoterFormData,
 } from '@/lib/validations/events';
 
 // ============================================================================
@@ -157,6 +158,20 @@ export async function regenerateSeats(tableId: string) {
     await tx.seat.createMany({ data: seats });
 
     return table;
+  });
+}
+
+export async function updateTableStatus(tableId: string, status: 'OPEN' | 'CLOSED' | 'HIDDEN') {
+  return prisma.table.update({
+    where: { id: tableId },
+    data: { status },
+  });
+}
+
+export async function updateTicketTypeStatus(ticketTypeId: string, status: 'OPEN' | 'CLOSED' | 'HIDDEN') {
+  return prisma.ticketType.update({
+    where: { id: ticketTypeId },
+    data: { status },
   });
 }
 
@@ -481,4 +496,164 @@ export async function deleteVoucherCode(voucherCodeId: string) {
   await prisma.voucherCode.delete({ where: { id: voucherCodeId } });
 
   return voucherCode;
+}
+
+// ============================================================================
+// EVENT PROMOTERS
+// ============================================================================
+
+export async function createEventPromoter(eventId: string, data: EventPromoterFormData) {
+  return prisma.$transaction(async (tx) => {
+    const voucherCode = await tx.voucherCode.create({
+      data: {
+        promotionId: data.promotionId,
+        code: data.code.toUpperCase(),
+        maxRedemptions: data.maxRedemptions,
+      },
+    });
+
+    const promoter = await tx.eventPromoter.create({
+      data: {
+        eventId,
+        name: data.name,
+        email: data.email || null,
+        phone: data.phone || null,
+        voucherCodeId: voucherCode.id,
+        commissionRate: data.commissionRate,
+        notes: data.notes || null,
+      },
+      include: {
+        voucherCode: {
+          include: { promotion: true },
+        },
+      },
+    });
+
+    return promoter;
+  });
+}
+
+export async function updateEventPromoter(
+  promoterId: string,
+  data: { name?: string; email?: string; phone?: string; commissionRate?: number | null; notes?: string | null },
+) {
+  const promoter = await prisma.eventPromoter.findUnique({
+    where: { id: promoterId },
+  });
+
+  if (!promoter) {
+    throw new Error('Promoter not found');
+  }
+
+  return prisma.eventPromoter.update({
+    where: { id: promoterId },
+    data: {
+      name: data.name,
+      email: data.email || null,
+      phone: data.phone || null,
+      commissionRate: data.commissionRate,
+      notes: data.notes,
+    },
+  });
+}
+
+export async function deleteEventPromoter(promoterId: string) {
+  const promoter = await prisma.eventPromoter.findUnique({
+    where: { id: promoterId },
+    include: { voucherCode: true },
+  });
+
+  if (!promoter) {
+    throw new Error('Promoter not found');
+  }
+
+  // Delete both in a transaction (VoucherCode cascade will handle orders link)
+  await prisma.$transaction(async (tx) => {
+    await tx.eventPromoter.delete({ where: { id: promoterId } });
+    await tx.voucherCode.delete({ where: { id: promoter.voucherCodeId } });
+  });
+
+  return promoter;
+}
+
+export async function getPromoterPerformance(eventId: string) {
+  const promoters = await prisma.eventPromoter.findMany({
+    where: { eventId },
+    include: {
+      voucherCode: {
+        include: {
+          promotion: {
+            select: { id: true, name: true, discountType: true, discountValue: true },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (promoters.length === 0) {
+    return { promoters: [], stats: [] };
+  }
+
+  // Aggregate confirmed order stats for all promoter voucher codes in one query
+  const voucherCodeIds = promoters.map((p) => p.voucherCodeId);
+
+  const orderStats = await prisma.order.groupBy({
+    by: ['voucherCodeId'],
+    where: {
+      voucherCodeId: { in: voucherCodeIds },
+      status: 'CONFIRMED',
+    },
+    _count: { id: true },
+    _sum: { total: true },
+  });
+
+  // Get ticket counts per voucher code
+  const ticketCounts = await prisma.ticket.groupBy({
+    by: ['orderId'],
+    where: {
+      order: {
+        voucherCodeId: { in: voucherCodeIds },
+        status: 'CONFIRMED',
+      },
+    },
+    _count: { id: true },
+  });
+
+  // Map orderId to voucherCodeId for ticket aggregation
+  const orders = await prisma.order.findMany({
+    where: {
+      voucherCodeId: { in: voucherCodeIds },
+      status: 'CONFIRMED',
+    },
+    select: { id: true, voucherCodeId: true },
+  });
+
+  const orderToVoucher = new Map(orders.map((o) => [o.id, o.voucherCodeId]));
+  const ticketsByVoucher = new Map<string, number>();
+  for (const tc of ticketCounts) {
+    const vcId = orderToVoucher.get(tc.orderId);
+    if (vcId) {
+      ticketsByVoucher.set(vcId, (ticketsByVoucher.get(vcId) || 0) + tc._count.id);
+    }
+  }
+
+  const statsMap = new Map(
+    orderStats.map((s) => [
+      s.voucherCodeId,
+      { orders: s._count.id, revenue: s._sum.total || 0 },
+    ]),
+  );
+
+  const stats = promoters.map((p) => {
+    const s = statsMap.get(p.voucherCodeId);
+    return {
+      promoterId: p.id,
+      orders: s?.orders || 0,
+      tickets: ticketsByVoucher.get(p.voucherCodeId) || 0,
+      revenue: s?.revenue || 0,
+    };
+  });
+
+  return { promoters, stats };
 }

@@ -4,14 +4,13 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { LogoutButton } from '@/components/layout/logout-button'
-import { Home, Calendar, Lock, Users, Globe, ArrowLeft } from 'lucide-react'
+import { Home, Calendar, Lock, Users, Globe, ArrowLeft, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { TenantMemberRole } from '@/prisma/generated/prisma/client'
 
 type TenantSidebarProps = {
   tenantSubdomain: string
   isApproved: boolean
-  memberRole: TenantMemberRole
+  permissions: string[]
   userName?: string | null
   userEmail?: string | null
 }
@@ -19,7 +18,7 @@ type TenantSidebarProps = {
 export default function TenantSidebar({
   tenantSubdomain,
   isApproved,
-  memberRole,
+  permissions,
   userName,
   userEmail
 }: TenantSidebarProps) {
@@ -29,16 +28,21 @@ export default function TenantSidebar({
   const homePath = basePath
   const eventsPath = `${basePath}/events`
   const teamPath = `${basePath}/team`
+  const rolesPath = `${basePath}/roles`
   const pageSettingsPath = `${basePath}/page-settings`
 
   const isHomeActive = pathname === homePath || pathname === basePath
   const isEventsActive = pathname?.startsWith(eventsPath)
   const isTeamActive = pathname?.startsWith(teamPath)
+  const isRolesActive = pathname?.startsWith(rolesPath)
   const isPageSettingsActive = pathname?.startsWith(pageSettingsPath)
 
-  const canSeeTeam = memberRole === 'OWNER' || memberRole === 'ADMIN'
-  const canSeePageSettings = memberRole === 'OWNER' || memberRole === 'ADMIN'
-  const canSeeEvents = memberRole !== 'MEMBER'
+  const has = (perm: string) => permissions.includes(perm)
+
+  const canSeeEvents = has('view_events')
+  const canSeeTeam = has('view_team') || has('manage_team')
+  const canSeeRoles = has('manage_roles')
+  const canSeePageSettings = has('manage_page')
 
   return (
     <aside className="w-64 border-r bg-background flex flex-col h-screen">
@@ -99,7 +103,7 @@ export default function TenantSidebar({
               "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium",
               "text-muted-foreground cursor-not-allowed opacity-60"
             )}
-            title={!isApproved ? "Available after application approval" : "Requires Manager role or above"}
+            title={!isApproved ? "Available after application approval" : "Requires View Events permission"}
           >
             <Lock className="h-4 w-4" />
             Events
@@ -118,6 +122,21 @@ export default function TenantSidebar({
           >
             <Users className="h-4 w-4" />
             Team
+          </Link>
+        )}
+
+        {isApproved && canSeeRoles && (
+          <Link
+            href={rolesPath}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+              isRolesActive
+                ? "bg-accent text-accent-foreground"
+                : "hover:bg-accent hover:text-accent-foreground text-foreground"
+            )}
+          >
+            <Shield className="h-4 w-4" />
+            Roles
           </Link>
         )}
 

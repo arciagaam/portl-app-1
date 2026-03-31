@@ -9,6 +9,7 @@ import { EventPortfolioForm, type EventPortfolioEntry } from '@/components/organ
 import { ComplianceForm } from '@/components/organizer/compliance-form';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { saveApplicationAction } from '@/app/actions/organizer';
 import { OrganizerApplication } from '@/prisma/generated/prisma/client';
 
@@ -39,7 +40,7 @@ export function ApplicationWizard({
 
     if (result.error || !result.data) {
       console.error('Error saving application:', result.error);
-      alert('Failed to save application. Please try again.');
+      toast.error('Failed to save application. Please try again.');
       return;
     }
 

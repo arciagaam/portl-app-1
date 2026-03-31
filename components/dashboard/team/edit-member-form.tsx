@@ -17,22 +17,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { toast } from 'sonner';
-import type { TenantMemberRole } from '@/prisma/generated/prisma/client';
 
 interface EditMemberFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   member: {
     id: string;
-    role: TenantMemberRole;
     title: string | null;
     tenantShowInProfile: boolean;
     user: {
@@ -42,10 +33,9 @@ interface EditMemberFormProps {
     };
   };
   subdomain: string;
-  isOwner: boolean;
 }
 
-export function EditMemberForm({ open, onOpenChange, member, subdomain, isOwner }: EditMemberFormProps) {
+export function EditMemberForm({ open, onOpenChange, member, subdomain }: EditMemberFormProps) {
   const router = useRouter();
 
   const memberName = member.user.firstName && member.user.lastName
@@ -55,7 +45,6 @@ export function EditMemberForm({ open, onOpenChange, member, subdomain, isOwner 
   const form = useForm<UpdateMemberData>({
     resolver: zodResolver(updateMemberSchema),
     defaultValues: {
-      role: member.role,
       title: member.title ?? '',
       tenantShowInProfile: member.tenantShowInProfile,
     },
@@ -80,30 +69,11 @@ export function EditMemberForm({ open, onOpenChange, member, subdomain, isOwner 
         <DialogHeader>
           <DialogTitle>Edit Member</DialogTitle>
           <DialogDescription>
-            Update {memberName}&apos;s role and details.
+            Update {memberName}&apos;s details. Use the role dropdown menu to manage role assignments.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          {isOwner && (
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Select
-                value={form.watch('role')}
-                onValueChange={(value) => form.setValue('role', value as TenantMemberRole)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ADMIN">Admin</SelectItem>
-                  <SelectItem value="MANAGER">Manager</SelectItem>
-                  <SelectItem value="MEMBER">Member</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
             <Input

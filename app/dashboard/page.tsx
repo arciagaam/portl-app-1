@@ -23,6 +23,12 @@ export default async function DashboardPage() {
           _count: { select: { events: true } },
         },
       },
+      memberRoles: {
+        include: {
+          role: { select: { name: true, color: true } },
+        },
+        orderBy: { role: { position: 'asc' } },
+      },
     },
     orderBy: { createdAt: 'asc' },
   })
@@ -52,9 +58,21 @@ export default async function DashboardPage() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">{tenant.name}</CardTitle>
-                      <Badge variant="secondary" className="capitalize">
-                        {membership.role.toLowerCase()}
-                      </Badge>
+                      <div className="flex gap-1">
+                        {membership.memberRoles.slice(0, 2).map((mr, i) => (
+                          <Badge
+                            key={i}
+                            style={{
+                              backgroundColor: `${mr.role.color}20`,
+                              color: mr.role.color,
+                              borderColor: `${mr.role.color}40`,
+                            }}
+                            className="border text-xs"
+                          >
+                            {mr.role.name}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                     <CardDescription>{tenant.subdomain}</CardDescription>
                   </CardHeader>

@@ -1,24 +1,12 @@
 import { cache } from 'react';
 import { prisma } from './prisma';
 import { getCurrentUser } from './auth';
-import type { TenantMemberRole } from '@/prisma/generated/prisma/client';
-
-const ROLE_HIERARCHY: Record<TenantMemberRole, number> = {
-  OWNER: 4,
-  ADMIN: 3,
-  MANAGER: 2,
-  MEMBER: 1,
-};
-
-/**
- * Check if a role meets the minimum required level
- */
-export function hasMinimumRole(
-  userRole: TenantMemberRole,
-  minimumRole: TenantMemberRole
-): boolean {
-  return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[minimumRole];
-}
+import {
+  getEffectivePermissions,
+  hasPermission,
+  isOwner as checkIsOwner,
+  type Permission,
+} from './permissions';
 
 /**
  * Validates if a tenant exists by subdomain.
@@ -78,14 +66,14 @@ export async function requireTenant(subdomain: string) {
 }
 
 /**
- * Require tenant access via TenantMember - verifies user has the minimum role
- * and tenant application is approved.
+ * Require tenant access via permission-based role system.
+ * Fetches membership with roles and checks effective permissions.
  *
  * Use in server actions for tenant-scoped operations.
  */
 export async function requireTenantAccess(
   subdomain: string,
-  minimumRole: TenantMemberRole = 'MEMBER'
+  requiredPermission?: Permission | Permission[]
 ) {
   const user = await getCurrentUser();
   if (!user) {
@@ -110,31 +98,52 @@ export async function requireTenantAccess(
         tenantId: tenant.id,
       },
     },
+    include: {
+      memberRoles: {
+        include: {
+          role: {
+            select: {
+              id: true,
+              name: true,
+              permissions: true,
+              isOwnerRole: true,
+              position: true,
+            },
+          },
+        },
+      },
+    },
   });
 
   if (!membership) {
     throw new Error('Unauthorized: You are not a member of this tenant');
   }
 
-  if (!hasMinimumRole(membership.role, minimumRole)) {
-    throw new Error(`Unauthorized: Requires at least ${minimumRole} role`);
+  const roles = membership.memberRoles.map((mr) => mr.role);
+  const permissions = getEffectivePermissions(roles);
+
+  if (requiredPermission && !hasPermission(permissions, requiredPermission)) {
+    const required = Array.isArray(requiredPermission)
+      ? requiredPermission.join(' or ')
+      : requiredPermission;
+    throw new Error(`Unauthorized: Requires ${required} permission`);
   }
 
   if (tenant.application?.status !== 'APPROVED') {
     throw new Error('Tenant application not approved');
   }
 
-  return { tenant, user, membership };
+  return { tenant, user, membership, permissions, isOwner: checkIsOwner(roles) };
 }
 
 /**
- * Require tenant owner - verifies user is at least ADMIN of the tenant
- * and tenant application is approved.
- *
- * Delegates to requireTenantAccess with ADMIN minimum role.
- * Maintains return type compatibility for existing callers.
+ * Require tenant owner - verifies user has owner role.
+ * Delegates to requireTenantAccess and checks isOwner flag.
  */
 export async function requireTenantOwner(subdomain: string) {
-  const { tenant, user } = await requireTenantAccess(subdomain, 'ADMIN');
-  return { tenant, user };
+  const result = await requireTenantAccess(subdomain);
+  if (!result.isOwner) {
+    throw new Error('Unauthorized: Owner role required');
+  }
+  return result;
 }

@@ -44,7 +44,6 @@ async function main() {
       data: {
         userId: tenant.ownerId,
         tenantId: tenant.id,
-        role: 'OWNER',
       },
     });
     console.log(`  Created OWNER membership for ${tenant.subdomain}`);

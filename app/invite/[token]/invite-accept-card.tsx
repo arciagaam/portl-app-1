@@ -13,7 +13,7 @@ interface InviteAcceptCardProps {
   token: string;
   invitation: {
     email: string;
-    role: string;
+    roles: { id: string; name: string; color: string }[];
     title: string | null;
     tenantName: string;
     tenantSubdomain: string;
@@ -25,8 +25,6 @@ interface InviteAcceptCardProps {
 export function InviteAcceptCard({ token, invitation, userEmail }: InviteAcceptCardProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-
-  const roleName = invitation.role.charAt(0) + invitation.role.slice(1).toLowerCase();
 
   const handleAccept = async () => {
     setIsLoading(true);
@@ -56,7 +54,19 @@ export function InviteAcceptCard({ token, invitation, userEmail }: InviteAcceptC
         <CardTitle className="text-xl">Join {invitation.tenantName}</CardTitle>
         <CardDescription>
           {invitation.inviterName} has invited you to join as{' '}
-          <Badge variant="secondary" className="ml-1">{roleName}</Badge>
+          {invitation.roles.map((role) => (
+            <Badge
+              key={role.id}
+              style={{
+                backgroundColor: `${role.color}20`,
+                color: role.color,
+                borderColor: `${role.color}40`,
+              }}
+              className="border text-xs ml-1"
+            >
+              {role.name}
+            </Badge>
+          ))}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
