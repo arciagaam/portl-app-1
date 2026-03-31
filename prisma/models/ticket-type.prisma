@@ -1,15 +1,16 @@
 model TicketType {
-  id            String      @id @default(cuid())
+  id            String          @id @default(cuid())
   eventId       String
   name          String
-  description   String?     @db.Text
+  description   String?         @db.Text
   kind          TicketKind
-  basePrice     Int        // Base price in PHP
-  quantityTotal Int?        // Optional total inventory
-  quantitySold  Int         @default(0)
-  transferrable  Boolean    @default(false)
-  cancellable     Boolean    @default(false)
-  
+  basePrice     Int             // Base price in PHP
+  quantityTotal Int?            // Optional total inventory
+  quantitySold  Int             @default(0)
+  transferrable  Boolean        @default(false)
+  cancellable     Boolean       @default(false)
+  status        InventoryStatus @default(OPEN)
+
   // For TABLE and SEAT kinds, link to specific table
   tableId       String?
 
@@ -29,6 +30,7 @@ model TicketType {
   @@index([eventId])
   @@index([kind])
   @@index([tableId])
+  @@index([status])
   @@map("ticket_types")
 }
 
@@ -36,4 +38,10 @@ enum TicketKind {
   GENERAL // Normal ticket
   TABLE   // Whole-table product
   SEAT    // Seat product
+}
+
+enum InventoryStatus {
+  OPEN
+  CLOSED
+  HIDDEN
 }

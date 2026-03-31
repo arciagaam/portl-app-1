@@ -1,6 +1,7 @@
 'use server';
 
 import { requireTenantAccess } from '@/lib/tenant';
+import { PERMISSIONS } from '@/lib/permissions';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { del } from '@vercel/blob';
@@ -21,7 +22,7 @@ function isValidStorageUrl(url: string | null): boolean {
  */
 export async function getTenantPageSettingsAction(tenantSubdomain: string) {
   try {
-    const { tenant } = await requireTenantAccess(tenantSubdomain, 'ADMIN');
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_PAGE);
 
     const tenantData = await prisma.tenant.findUnique({
       where: { id: tenant.id },
@@ -63,7 +64,7 @@ export async function getTenantPageSettingsAction(tenantSubdomain: string) {
  */
 export async function updateTenantBrandingAction(tenantSubdomain: string, data: TenantBrandingFormData) {
   try {
-    const { tenant } = await requireTenantAccess(tenantSubdomain, 'ADMIN');
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_PAGE);
 
     await prisma.tenant.update({
       where: { id: tenant.id },
@@ -99,7 +100,7 @@ export async function updateTenantLogoAction(tenantSubdomain: string, url: strin
       return { error: 'Invalid URL' };
     }
 
-    const { tenant } = await requireTenantAccess(tenantSubdomain, 'ADMIN');
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_PAGE);
 
     const current = await prisma.tenant.findUnique({
       where: { id: tenant.id },
@@ -137,7 +138,7 @@ export async function updateTenantBannerAction(tenantSubdomain: string, url: str
       return { error: 'Invalid URL' };
     }
 
-    const { tenant } = await requireTenantAccess(tenantSubdomain, 'ADMIN');
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_PAGE);
 
     const current = await prisma.tenant.findUnique({
       where: { id: tenant.id },
@@ -175,7 +176,7 @@ export async function addTenantImageAction(tenantSubdomain: string, url: string)
       return { error: 'Invalid URL' };
     }
 
-    const { tenant } = await requireTenantAccess(tenantSubdomain, 'ADMIN');
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_PAGE);
 
     const count = await prisma.tenantImage.count({ where: { tenantId: tenant.id } });
     if (count >= MAX_TENANT_IMAGES) {
@@ -207,7 +208,7 @@ export async function addTenantImageAction(tenantSubdomain: string, url: string)
  */
 export async function deleteTenantImageAction(tenantSubdomain: string, imageId: string) {
   try {
-    const { tenant } = await requireTenantAccess(tenantSubdomain, 'ADMIN');
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_PAGE);
 
     const image = await prisma.tenantImage.findUnique({
       where: { id: imageId },
@@ -261,7 +262,7 @@ export async function deleteTenantImageAction(tenantSubdomain: string, imageId: 
  */
 export async function reorderTenantImagesAction(tenantSubdomain: string, imageIds: string[]) {
   try {
-    const { tenant } = await requireTenantAccess(tenantSubdomain, 'ADMIN');
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_PAGE);
 
     const images = await prisma.tenantImage.findMany({
       where: { tenantId: tenant.id },

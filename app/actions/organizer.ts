@@ -4,18 +4,38 @@ import { getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import type { OrganizerApplicationStatus } from '@/prisma/generated/prisma/client';
+import { seedDefaultRoles } from '@/lib/default-roles';
 
 // Step-specific schemas for saveApplicationAction
-const pastEventSchema = z.object({ name: z.string(), date: z.string(), venue: z.string(), description: z.string() });
-const venueSchema = z.object({ name: z.string(), type: z.string() });
-const artistsTalentSchema = z.object({ genres: z.array(z.string()), artists: z.array(z.string()) });
-const referenceSchema = z.object({ name: z.string(), contact: z.string(), relationship: z.string() });
+const pastEventSchema = z.object({
+  name: z.string(),
+  date: z.string(),
+  photos: z.array(z.string()).default([]),
+  videoLinks: z.array(z.string()).default([]),
+  estimatedAttendance: z.string().optional(),
+  pressCoverage: z.string().optional(),
+});
+const venueSchema = z.object({
+  name: z.string(),
+  relationship: z.enum(['owner', 'partner', 'renter']),
+  images: z.array(z.string()).default([]),
+});
+const artistsTalentSchema = z.object({
+  notableArtists: z.string().optional(),
+  recurringTalent: z.string().optional(),
+});
+const referenceSchema = z.object({
+  name: z.string(),
+  company: z.string(),
+  contact: z.string(),
+  type: z.enum(['client_testimonial', 'partner', 'industry']),
+});
 
 const applicationStep1Schema = z.object({
-  pastEvents: z.array(pastEventSchema).optional(),
-  venues: z.array(venueSchema).optional(),
-  artistsTalent: artistsTalentSchema.optional(),
-  references: z.array(referenceSchema).optional(),
+  pastEvents: z.array(pastEventSchema).nullish(),
+  venues: z.array(venueSchema).nullish(),
+  artistsTalent: artistsTalentSchema.nullish(),
+  references: z.array(referenceSchema).nullish(),
 });
 
 const applicationStep2Schema = z.object({
@@ -78,9 +98,14 @@ export async function getApplicationAction(tenantId: string) {
       where: {
         userId_tenantId: { userId: user.id, tenantId },
       },
+      include: {
+        memberRoles: {
+          include: { role: { select: { isOwnerRole: true } } },
+        },
+      },
     });
 
-    if (!membership || membership.role !== 'OWNER') {
+    if (!membership || !membership.memberRoles.some((mr) => mr.role.isOwnerRole)) {
       return { error: 'Unauthorized' };
     }
 
@@ -184,13 +209,26 @@ export async function registerOrganizerAction(data: {
         },
       });
 
-      await tx.tenantMember.create({
+      // Seed default roles for the tenant
+      const createdRoles = await seedDefaultRoles(tx, tenant.id);
+      const ownerRole = createdRoles.find((r) => r.isOwnerRole);
+
+      // Create owner membership with Owner role
+      const member = await tx.tenantMember.create({
         data: {
           userId: user.id,
           tenantId: tenant.id,
-          role: 'OWNER',
         },
       });
+
+      if (ownerRole) {
+        await tx.memberRole.create({
+          data: {
+            tenantMemberId: member.id,
+            tenantRoleId: ownerRole.id,
+          },
+        });
+      }
 
       return { tenant, application };
     });
@@ -254,9 +292,14 @@ export async function saveApplicationAction(
       where: {
         userId_tenantId: { userId: user.id, tenantId },
       },
+      include: {
+        memberRoles: {
+          include: { role: { select: { isOwnerRole: true } } },
+        },
+      },
     });
 
-    if (!membership || membership.role !== 'OWNER') {
+    if (!membership || !membership.memberRoles.some((mr) => mr.role.isOwnerRole)) {
       return { error: 'Unauthorized' };
     }
 
@@ -300,7 +343,7 @@ export async function saveApplicationAction(
       communityGuidelinesAccepted?: boolean;
       submittedAt?: Date;
     } = {
-      status: shouldExit ? 'IN_PROGRESS' : application.status,
+      status: application.status === 'NOT_STARTED' ? 'IN_PROGRESS' : application.status,
       updatedAt: new Date(),
     };
 

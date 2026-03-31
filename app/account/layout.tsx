@@ -8,7 +8,12 @@ async function getUserOrganizations(userId: string) {
         where: { userId },
         select: {
             id: true,
-            role: true,
+            memberRoles: {
+                select: {
+                    role: { select: { name: true, color: true } },
+                },
+                orderBy: { role: { position: 'asc' } },
+            },
             tenant: { select: { name: true, subdomain: true } },
         },
         orderBy: { createdAt: 'asc' },

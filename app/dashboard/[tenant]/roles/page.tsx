@@ -1,11 +1,10 @@
 import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { getTenantPageSettingsAction } from '@/app/actions/tenant-page';
-import { PageSettingsSection } from '@/components/dashboard/page-settings/page-settings-section';
 import { getEffectivePermissions, hasPermission, PERMISSIONS } from '@/lib/permissions';
+import { RolesList } from '@/components/dashboard/roles/roles-list';
 
-async function verifyAccess(userId: string, subdomain: string) {
+async function getRolesData(userId: string, subdomain: string) {
   const tenant = await prisma.tenant.findUnique({
     where: { subdomain },
     include: { application: true },
@@ -31,14 +30,22 @@ async function verifyAccess(userId: string, subdomain: string) {
   const roles = membership.memberRoles.map((mr) => mr.role);
   const permissions = getEffectivePermissions(roles);
 
-  if (!hasPermission(permissions, PERMISSIONS.MANAGE_PAGE)) {
+  if (!hasPermission(permissions, PERMISSIONS.MANAGE_ROLES)) {
     return null;
   }
 
-  return { tenant };
+  const tenantRoles = await prisma.tenantRole.findMany({
+    where: { tenantId: tenant.id },
+    include: {
+      _count: { select: { members: true } },
+    },
+    orderBy: { position: 'asc' },
+  });
+
+  return { tenant, tenantRoles, permissions: Array.from(permissions) };
 }
 
-export default async function PageSettingsPage({
+export default async function RolesPage({
   params,
 }: {
   params: Promise<{ tenant: string }>;
@@ -47,39 +54,33 @@ export default async function PageSettingsPage({
   const { tenant: subdomain } = await params;
 
   if (!user) {
-    redirect(`/auth/signin?callbackUrl=/dashboard/${subdomain}/page-settings`);
+    redirect(`/auth/signin?callbackUrl=/dashboard/${subdomain}/roles`);
   }
 
-  const access = await verifyAccess(user.id, subdomain);
+  const data = await getRolesData(user.id, subdomain);
 
-  if (!access) {
+  if (!data) {
     redirect(`/dashboard/${subdomain}`);
   }
 
-  const isApproved = access.tenant.application?.status === 'APPROVED';
-
+  const isApproved = data.tenant.application?.status === 'APPROVED';
   if (!isApproved) {
-    redirect(`/dashboard/${subdomain}`);
-  }
-
-  const result = await getTenantPageSettingsAction(subdomain);
-
-  if ('error' in result) {
     redirect(`/dashboard/${subdomain}`);
   }
 
   return (
     <div className="container mx-auto px-6 py-8 max-w-5xl space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Page Settings</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Roles</h1>
         <p className="text-muted-foreground mt-1">
-          Customize your public landing page for {access.tenant.name}.
+          Manage roles and permissions for {data.tenant.name}.
         </p>
       </div>
 
-      <PageSettingsSection
-        tenant={result.data}
-        tenantSubdomain={subdomain}
+      <RolesList
+        roles={data.tenantRoles}
+        subdomain={subdomain}
+        permissions={data.permissions}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@/prisma/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
+import { DEFAULT_ROLES } from '@/lib/default-roles';
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
@@ -60,12 +61,11 @@ async function main() {
     });
     console.log('✅ Created test tenant with approved application');
 
-    // Create OWNER membership
+    // Create OWNER membership (roles assigned below)
     await prisma.tenantMember.create({
       data: {
         userId: testUser.id,
         tenantId: testTenant.id,
-        role: 'OWNER',
       },
     });
     console.log('✅ Created OWNER membership for test tenant');
@@ -86,8 +86,36 @@ async function main() {
     console.log('✅ Updated tenant application to approved');
   }
 
+  // Seed default roles for the tenant
+  const existingRoles = await prisma.tenantRole.findMany({
+    where: { tenantId: testTenant.id },
+  });
+
+  let ownerRoleId: string | null = null;
+
+  if (existingRoles.length === 0) {
+    for (const roleDef of DEFAULT_ROLES) {
+      const role = await prisma.tenantRole.create({
+        data: {
+          tenantId: testTenant.id,
+          name: roleDef.name,
+          color: roleDef.color,
+          permissions: roleDef.permissions,
+          position: roleDef.position,
+          isDefault: roleDef.isDefault,
+          isOwnerRole: roleDef.isOwnerRole,
+        },
+      });
+      if (role.isOwnerRole) ownerRoleId = role.id;
+    }
+    console.log('✅ Created default roles for test tenant');
+  } else {
+    const ownerRole = existingRoles.find((r) => r.isOwnerRole);
+    ownerRoleId = ownerRole?.id ?? null;
+  }
+
   // Ensure OWNER membership exists
-  await prisma.tenantMember.upsert({
+  const membership = await prisma.tenantMember.upsert({
     where: {
       userId_tenantId: {
         userId: testUser.id,
@@ -98,9 +126,26 @@ async function main() {
     create: {
       userId: testUser.id,
       tenantId: testTenant.id,
-      role: 'OWNER',
     },
   });
+
+  // Assign Owner role if not already assigned
+  if (ownerRoleId) {
+    await prisma.memberRole.upsert({
+      where: {
+        tenantMemberId_tenantRoleId: {
+          tenantMemberId: membership.id,
+          tenantRoleId: ownerRoleId,
+        },
+      },
+      update: {},
+      create: {
+        tenantMemberId: membership.id,
+        tenantRoleId: ownerRoleId,
+      },
+    });
+    console.log('✅ Assigned Owner role to test user');
+  }
 
   // Create a sample event linked to the tenant
   const event = await prisma.event.create({

@@ -29,6 +29,7 @@ model Tenant {
   members     TenantMember[]
   invitations TenantInvitation[]
   images      TenantImage[]
+  roles       TenantRole[]
 
   @@index([ownerId])
   @@map("tenants")

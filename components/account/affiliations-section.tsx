@@ -7,20 +7,17 @@ import { Switch } from '@/components/ui/switch';
 import { Building2 } from 'lucide-react';
 import { toggleMemberProfileVisibilityAction } from '@/app/actions/tenant-members';
 import { toast } from 'sonner';
-import type { TenantMemberRole } from '@/prisma/generated/prisma/client';
-
-const roleColors: Record<string, string> = {
-  OWNER: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-400',
-  ADMIN: 'bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-400',
-  MANAGER: 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-400',
-  MEMBER: 'bg-muted text-muted-foreground',
-};
 
 interface Affiliation {
   id: string;
-  role: TenantMemberRole;
   title: string | null;
   userShowInProfile: boolean;
+  memberRoles: {
+    role: {
+      name: string;
+      color: string;
+    };
+  }[];
   tenant: {
     name: string;
     subdomain: string;
@@ -73,9 +70,21 @@ export function AffiliationsSection({ affiliations }: AffiliationsSectionProps) 
                 {affiliation.title && (
                   <span className="text-xs text-muted-foreground">{affiliation.title}</span>
                 )}
-                <Badge className={roleColors[affiliation.role]}>
-                  {affiliation.role}
-                </Badge>
+                <div className="flex gap-1">
+                  {affiliation.memberRoles.map((mr, i) => (
+                    <Badge
+                      key={i}
+                      style={{
+                        backgroundColor: `${mr.role.color}20`,
+                        color: mr.role.color,
+                        borderColor: `${mr.role.color}40`,
+                      }}
+                      className="border text-xs"
+                    >
+                      {mr.role.name}
+                    </Badge>
+                  ))}
+                </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">Show on profile</span>
                   <Switch

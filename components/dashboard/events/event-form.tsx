@@ -26,9 +26,10 @@ interface EventFormProps {
   defaultValues?: Partial<EventFormData>;
   eventId?: string;
   onSubmit: (data: EventFormData) => Promise<{ error?: string; data?: { id: string } }>;
+  onSuccess?: (data: { id: string }) => void;
 }
 
-export function EventForm({ tenantSubdomain, defaultValues, eventId, onSubmit }: EventFormProps) {
+export function EventForm({ tenantSubdomain, defaultValues, eventId, onSubmit, onSuccess }: EventFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -75,8 +76,12 @@ export function EventForm({ tenantSubdomain, defaultValues, eventId, onSubmit }:
     } else if (result.data) {
       setMessage({ type: 'success', text: eventId ? 'Event updated successfully!' : 'Event created successfully!' });
       toast.success(eventId ? 'Event updated successfully!' : 'Event created successfully!');
-      router.push(`/dashboard/${tenantSubdomain}/events/${result.data.id}`);
-      router.refresh();
+      if (onSuccess) {
+        onSuccess(result.data);
+      } else {
+        router.push(`/dashboard/${tenantSubdomain}/events/${result.data.id}`);
+        router.refresh();
+      }
     }
   };
 

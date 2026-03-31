@@ -15,6 +15,14 @@ async function getUserAffiliations(userId: string) {
             tenant: {
                 select: { name: true, subdomain: true },
             },
+            memberRoles: {
+                include: {
+                    role: {
+                        select: { name: true, color: true },
+                    },
+                },
+                orderBy: { role: { position: 'asc' } },
+            },
         },
         orderBy: { createdAt: 'asc' },
     })

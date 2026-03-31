@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '@/lib/admin';
+import { seedDefaultRoles } from '@/lib/default-roles';
 
 /**
  * Get all organizer applications with tenant and owner details
@@ -164,26 +165,55 @@ export async function updateApplicationStatusAction(
       data: updateData,
     });
 
-    // If approved, activate the tenant and create OWNER membership
+    // If approved, activate the tenant, ensure roles exist, and assign Owner role
     if (status === 'APPROVED') {
       const tenant = await prisma.tenant.update({
         where: { id: application.tenantId },
         data: { status: 'ACTIVE' },
       });
-      await prisma.tenantMember.upsert({
+
+      // Ensure default roles exist
+      const existingRoles = await prisma.tenantRole.findMany({
+        where: { tenantId: tenant.id },
+      });
+      let ownerRole = existingRoles.find((r) => r.isOwnerRole);
+
+      if (existingRoles.length === 0) {
+        const created = await seedDefaultRoles(prisma, tenant.id);
+        ownerRole = created.find((r) => r.isOwnerRole);
+      }
+
+      // Ensure owner membership exists
+      const member = await prisma.tenantMember.upsert({
         where: {
           userId_tenantId: {
             userId: tenant.ownerId,
             tenantId: tenant.id,
           },
         },
-        update: { role: 'OWNER' },
+        update: {},
         create: {
           userId: tenant.ownerId,
           tenantId: tenant.id,
-          role: 'OWNER',
         },
       });
+
+      // Assign Owner role
+      if (ownerRole) {
+        await prisma.memberRole.upsert({
+          where: {
+            tenantMemberId_tenantRoleId: {
+              tenantMemberId: member.id,
+              tenantRoleId: ownerRole.id,
+            },
+          },
+          update: {},
+          create: {
+            tenantMemberId: member.id,
+            tenantRoleId: ownerRole.id,
+          },
+        });
+      }
     }
 
     // If rejected, set tenant to inactive

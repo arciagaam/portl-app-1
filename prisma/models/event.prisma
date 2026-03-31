@@ -19,6 +19,7 @@ model Event {
   tables      Table[]
   ticketTypes TicketType[]
   promotions  Promotion[]
+  promoters   EventPromoter[]
   cartItems   CartItem[]
   orders      Order[]
   tickets     Ticket[]

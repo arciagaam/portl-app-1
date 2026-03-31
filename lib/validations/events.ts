@@ -30,6 +30,7 @@ export const tableSchema = z.object({
   minSpend: z.number().int().nonnegative().optional(),
   notes: z.string().optional(),
   mode: z.enum(['EXCLUSIVE', 'SHARED']),
+  status: z.enum(['OPEN', 'CLOSED', 'HIDDEN']).optional(),
 });
 
 export type TableFormData = z.infer<typeof tableSchema>;
@@ -60,6 +61,7 @@ export const ticketTypeSchema = z.object({
   cancellable: z.boolean(),
   tableId: z.string().optional().nullable(),
   imageUrl: z.string().url().optional().nullable(),
+  status: z.enum(['OPEN', 'CLOSED', 'HIDDEN']).optional(),
 }).refine((data) => {
   if (data.kind === 'TABLE' || data.kind === 'SEAT') {
     return !!data.tableId;
@@ -138,6 +140,20 @@ export const promotionSchema = z.object({
 });
 
 export type PromotionFormData = z.infer<typeof promotionSchema>;
+
+// Event Promoter validation
+export const eventPromoterSchema = z.object({
+  name: z.string().min(1, 'Promoter name is required'),
+  email: z.string().email('Invalid email').optional().or(z.literal('')),
+  phone: z.string().optional(),
+  code: z.string().min(1, 'Promo code is required').regex(/^[A-Z0-9-_]+$/i, 'Code can only contain letters, numbers, hyphens, and underscores'),
+  promotionId: z.string().min(1, 'Promotion is required'),
+  commissionRate: z.number().int().min(0).max(10000).optional().nullable(),
+  maxRedemptions: z.number().int().positive().optional().nullable(),
+  notes: z.string().optional(),
+});
+
+export type EventPromoterFormData = z.infer<typeof eventPromoterSchema>;
 
 // Voucher Code validation
 export const voucherCodeSchema = z.object({

@@ -24,7 +24,7 @@ export function ReferencesForm({ initialData, onChange }: ReferencesFormProps) {
   const [references, setReferences] = useState<Reference[]>(
     initialData && initialData.length > 0
       ? initialData
-      : [{ name: '', company: '', contact: '', type: 'industry' }]
+      : []
   );
 
   const updateReference = (index: number, field: keyof Reference, value: string) => {
@@ -42,7 +42,6 @@ export function ReferencesForm({ initialData, onChange }: ReferencesFormProps) {
   };
 
   const removeReference = (index: number) => {
-    if (references.length <= 1) return;
     const newReferences = references.filter((_, i) => i !== index);
     setReferences(newReferences);
     onChange(newReferences);
@@ -55,15 +54,13 @@ export function ReferencesForm({ initialData, onChange }: ReferencesFormProps) {
           <CardContent className="pt-6 space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="font-medium">Reference {index + 1}</h3>
-              {references.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeReference(index)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => removeReference(index)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
 
             <div className="space-y-2">

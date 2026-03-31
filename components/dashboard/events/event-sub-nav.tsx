@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, TableIcon, Ticket, Tag, ImageIcon, ClipboardList, UserCheck } from 'lucide-react';
+import { LayoutDashboard, TableIcon, Ticket, Tag, ImageIcon, ClipboardList, UserCheck, Megaphone } from 'lucide-react';
 
 interface EventSubNavProps {
   eventId: string;
@@ -12,6 +12,7 @@ interface EventSubNavProps {
     tables: number;
     ticketTypes: number;
     promotions: number;
+    promoters?: number;
     images: number;
     orders?: number;
     attendees?: number;
@@ -53,6 +54,12 @@ export function EventSubNav({ eventId, tenantSubdomain, tableCounts }: EventSubN
       href: `${basePath}/promotions`,
       icon: Tag,
       isActive: pathname === `${basePath}/promotions`,
+    },
+    {
+      label: `Promoters${tableCounts?.promoters !== undefined ? ` (${tableCounts.promoters})` : ''}`,
+      href: `${basePath}/promoters`,
+      icon: Megaphone,
+      isActive: pathname === `${basePath}/promoters`,
     },
     {
       label: `Orders${tableCounts?.orders !== undefined ? ` (${tableCounts.orders})` : ''}`,

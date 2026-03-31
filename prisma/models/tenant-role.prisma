@@ -1,0 +1,34 @@
+model TenantRole {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  color       String   @default("#6B7280")
+  permissions String[]
+  position    Int
+  isDefault   Boolean  @default(false)
+  isOwnerRole Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  members MemberRole[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("tenant_roles")
+}
+
+model MemberRole {
+  id             String   @id @default(cuid())
+  tenantMemberId String
+  tenantRoleId   String
+  assignedAt     DateTime @default(now())
+
+  member TenantMember @relation(fields: [tenantMemberId], references: [id], onDelete: Cascade)
+  role   TenantRole   @relation(fields: [tenantRoleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantMemberId, tenantRoleId])
+  @@index([tenantMemberId])
+  @@index([tenantRoleId])
+  @@map("member_roles")
+}

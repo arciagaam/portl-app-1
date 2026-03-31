@@ -219,6 +219,10 @@ export async function addToCartAction(
       return { error: 'Event is not available for purchase' };
     }
 
+    if (ticketType.status === 'HIDDEN' || ticketType.status === 'CLOSED') {
+      return { error: 'This ticket type is not available for purchase' };
+    }
+
     // Check availability
     if (ticketType.quantityTotal !== null) {
       const available = ticketType.quantityTotal - ticketType.quantitySold;

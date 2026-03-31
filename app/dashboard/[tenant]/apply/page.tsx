@@ -19,10 +19,15 @@ async function getApplication(userId: string, subdomain: string) {
     where: {
       userId_tenantId: { userId, tenantId: tenant.id },
     },
+    include: {
+      memberRoles: {
+        include: { role: { select: { isOwnerRole: true } } },
+      },
+    },
   })
 
   // Only OWNERs can manage applications
-  if (!membership || membership.role !== 'OWNER') {
+  if (!membership || !membership.memberRoles.some((mr) => mr.role.isOwnerRole)) {
     return null
   }
 
