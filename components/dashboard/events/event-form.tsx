@@ -229,26 +229,28 @@ export function EventForm({ tenantSubdomain, defaultValues, eventId, onSubmit, o
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="status">Status *</Label>
-        <Select
-          value={status}
-          onValueChange={(value) => setValue('status', value as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED')}
-          disabled={isLoading}
-        >
-          <SelectTrigger className={errors.status ? 'border-red-500' : ''}>
-            <SelectValue placeholder="Select status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="DRAFT">Draft</SelectItem>
-            <SelectItem value="PUBLISHED">Published</SelectItem>
-            <SelectItem value="ARCHIVED">Archived</SelectItem>
-          </SelectContent>
-        </Select>
-        {errors.status && (
-          <p className="text-sm text-red-600">{errors.status.message}</p>
-        )}
-      </div>
+      {eventId && (
+        <div className="space-y-2">
+          <Label htmlFor="status">Status *</Label>
+          <Select
+            value={status}
+            onValueChange={(value) => setValue('status', value as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED')}
+            disabled={isLoading}
+          >
+            <SelectTrigger className={errors.status ? 'border-red-500' : ''}>
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="DRAFT">Draft</SelectItem>
+              <SelectItem value="PUBLISHED">Published</SelectItem>
+              <SelectItem value="ARCHIVED">Archived</SelectItem>
+            </SelectContent>
+          </Select>
+          {errors.status && (
+            <p className="text-sm text-red-600">{errors.status.message}</p>
+          )}
+        </div>
+      )}
 
       <div className="flex justify-end gap-2 pt-4">
         <Button
