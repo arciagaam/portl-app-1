@@ -74,23 +74,24 @@ export function EventHeader({ event, tenantSubdomain }: EventHeaderProps) {
   };
 
   return (
-    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+    <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold tracking-tight">{event.name}</h1>
           <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
         </div>
-        <div className="text-muted-foreground">
-          <p>{event.venueName}</p>
-          <p className="text-sm">
-            {formatDate(event.startDate)} at {event.startTime}
-          </p>
+        <h1 className="text-3xl font-bold tracking-tight">{event.name}</h1>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          <span>{event.venueName}</span>
+          <span className="text-border">|</span>
+          <span>{formatDate(event.startDate)}</span>
+          <span className="text-border">|</span>
+          <span>{event.startTime}</span>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         {event.status === 'DRAFT' && (
-          <Button onClick={handlePublish} disabled={isLoading}>
+          <Button onClick={handlePublish} disabled={isLoading} size="lg">
             <Globe className="mr-2 h-4 w-4" />
             Publish
           </Button>

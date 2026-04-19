@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
 import { Stepper, type Step } from '@/components/ui/stepper';
 import { EventForm } from '@/components/dashboard/events/event-form';
 import { WizardTablesStep } from '@/components/dashboard/events/wizard-tables-step';
@@ -60,23 +59,23 @@ export function CreateEventWizard({ tenantSubdomain, onCreateEvent }: CreateEven
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <Stepper steps={steps} currentStep={currentStep} onStepClick={handleStepClick} />
 
-      <Card>
-        <CardContent className="pt-6">
+      <div className="border">
+        <div className="p-6">
           {currentStep === 1 && (
             <>
               {eventId && eventSummary ? (
                 <div className="space-y-4">
-                  <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
+                  <div className="border bg-muted/30 p-5 space-y-2">
                     <h3 className="font-semibold text-lg">{eventSummary.name}</h3>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1.5">
                         <MapPin className="h-4 w-4" />
                         {eventSummary.venueName}
                       </span>
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1.5">
                         <CalendarDays className="h-4 w-4" />
                         {eventSummary.startDate}
                       </span>
@@ -88,7 +87,7 @@ export function CreateEventWizard({ tenantSubdomain, onCreateEvent }: CreateEven
                   <div className="flex justify-end">
                     <button
                       onClick={() => setCurrentStep(2)}
-                      className="text-sm text-primary hover:underline"
+                      className="text-sm font-medium text-foreground hover:underline underline-offset-4"
                     >
                       Continue to Tables & Seats &rarr;
                     </button>
@@ -131,15 +130,14 @@ export function CreateEventWizard({ tenantSubdomain, onCreateEvent }: CreateEven
             <WizardTicketsStep
               tenantSubdomain={tenantSubdomain}
               eventId={eventId}
-              tables={tables}
               ticketTypes={ticketTypes}
               onTicketTypeCreated={(tt) => setTicketTypes((prev) => [...prev, tt])}
               onBack={() => setCurrentStep(2)}
               onFinish={handleFinish}
             />
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

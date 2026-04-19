@@ -5,7 +5,7 @@ import { PERMISSIONS } from '@/lib/permissions';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { del } from '@vercel/blob';
-import type { EventFormData, TableFormData, BulkTableFormData, TicketTypeFormData, PriceTierFormData, PromotionFormData, VoucherCodeFormData, EventPromoterFormData } from '@/lib/validations/events';
+import type { EventFormData, TableFormData, BulkTableFormData, TicketTypeFormData, TicketTypeWithPromotionFormData, TableWithPromotionFormData, PriceTierFormData, PromotionFormData, VoucherCodeFormData, EventPromoterFormData } from '@/lib/validations/events';
 import * as helpers from '@/lib/event-helpers';
 import { handleActionError } from '@/lib/action-utils';
 
@@ -76,30 +76,12 @@ export async function getEventByIdForTenantAction(tenantSubdomain: string, event
           orderBy: { position: 'asc' },
         },
         tables: {
-          include: {
-            seats: true,
-            ticketTypes: {
-              select: {
-                id: true,
-                name: true,
-                quantityTotal: true,
-                quantitySold: true,
-                status: true,
-              },
-            },
-            _count: {
-              select: {
-                ticketTypes: true,
-              },
-            },
-          },
           orderBy: {
             label: 'asc',
           },
         },
         ticketTypes: {
           include: {
-            table: true,
             priceTiers: {
               orderBy: {
                 priority: 'desc',
@@ -296,6 +278,20 @@ export async function createTableForTenantAction(tenantSubdomain: string, eventI
   }
 }
 
+export async function createTableWithPromotionForTenantAction(tenantSubdomain: string, eventId: string, data: TableWithPromotionFormData) {
+  try {
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
+    await verifyEventBelongsToTenant(eventId, tenant.id);
+    const result = await helpers.createTableWithPromotion(eventId, data);
+    revalidatePath(`/dashboard/${tenantSubdomain}/events/${eventId}`);
+    return { data: result };
+  } catch (error) {
+    return handleActionError(error, 'Failed to create table', {
+      'Unique constraint': 'A table with this label already exists for this event',
+    });
+  }
+}
+
 export async function bulkCreateTablesForTenantAction(tenantSubdomain: string, eventId: string, data: BulkTableFormData) {
   try {
     const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
@@ -305,34 +301,6 @@ export async function bulkCreateTablesForTenantAction(tenantSubdomain: string, e
     return { data: result };
   } catch (error) {
     return handleActionError(error, 'Failed to bulk create tables');
-  }
-}
-
-export async function updateTableCapacityForTenantAction(tenantSubdomain: string, tableId: string, newCapacity: number) {
-  try {
-    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
-    const table = await prisma.table.findUnique({ where: { id: tableId }, include: { event: true } });
-    if (!table) return { error: 'Table not found' };
-    await verifyEventBelongsToTenant(table.eventId, tenant.id);
-    const result = await helpers.updateTableCapacity(tableId, newCapacity);
-    revalidatePath(`/dashboard/${tenantSubdomain}/events/${table.eventId}`);
-    return { data: result };
-  } catch (error) {
-    return handleActionError(error, 'Failed to update table capacity');
-  }
-}
-
-export async function regenerateSeatsForTenantAction(tenantSubdomain: string, tableId: string) {
-  try {
-    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
-    const table = await prisma.table.findUnique({ where: { id: tableId }, include: { event: true } });
-    if (!table) return { error: 'Table not found' };
-    await verifyEventBelongsToTenant(table.eventId, tenant.id);
-    const result = await helpers.regenerateSeats(tableId);
-    revalidatePath(`/dashboard/${tenantSubdomain}/events/${table.eventId}`);
-    return { data: result };
-  } catch (error) {
-    return handleActionError(error, 'Failed to regenerate seats');
   }
 }
 
@@ -389,7 +357,6 @@ export async function getTicketTypesByEventForTenantAction(tenantSubdomain: stri
     const ticketTypes = await prisma.ticketType.findMany({
       where: { eventId },
       include: {
-        table: true,
         priceTiers: { orderBy: { priority: 'desc' } },
       },
       orderBy: { createdAt: 'desc' },
@@ -407,6 +374,18 @@ export async function createTicketTypeForTenantAction(tenantSubdomain: string, e
     const ticketType = await helpers.createTicketType(eventId, data);
     revalidatePath(`/dashboard/${tenantSubdomain}/events/${eventId}`);
     return { data: ticketType };
+  } catch (error) {
+    return handleActionError(error, 'Failed to create ticket type');
+  }
+}
+
+export async function createTicketTypeWithPromotionForTenantAction(tenantSubdomain: string, eventId: string, data: TicketTypeWithPromotionFormData) {
+  try {
+    const { tenant } = await requireTenantAccess(tenantSubdomain, PERMISSIONS.MANAGE_EVENTS);
+    await verifyEventBelongsToTenant(eventId, tenant.id);
+    const result = await helpers.createTicketTypeWithPromotion(eventId, data);
+    revalidatePath(`/dashboard/${tenantSubdomain}/events/${eventId}`);
+    return { data: result };
   } catch (error) {
     return handleActionError(error, 'Failed to create ticket type');
   }
@@ -770,7 +749,7 @@ export async function getAttendeesForEventAction(tenantSubdomain: string, eventI
         order: { status: 'CONFIRMED' },
       },
       include: {
-        ticketType: { select: { id: true, name: true, kind: true } },
+        ticketType: { select: { id: true, name: true } },
         order: {
           select: {
             orderNumber: true,
@@ -808,7 +787,7 @@ export async function checkInTicketAction(tenantSubdomain: string, ticketCode: s
       where: { ticketCode },
       include: {
         event: { select: { id: true, tenantId: true, name: true } },
-        ticketType: { select: { name: true, kind: true } },
+        ticketType: { select: { name: true } },
       },
     });
 
@@ -847,7 +826,7 @@ export async function checkInTicketAction(tenantSubdomain: string, ticketCode: s
         ticketId: updated.id,
         ticketCode: updated.ticketCode,
         attendeeName,
-        ticketType: ticket.ticketType.name,
+        ticketType: ticket.ticketType?.name ?? 'Unknown',
         eventName: ticket.event.name,
       },
     };
@@ -923,7 +902,7 @@ export async function getOrdersForEventAction(tenantSubdomain: string, eventId: 
         },
         items: {
           include: {
-            ticketType: { select: { id: true, name: true, kind: true } },
+            ticketType: { select: { id: true, name: true } },
           },
         },
         tickets: {

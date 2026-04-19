@@ -3,16 +3,15 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import { TicketTypeForm } from './ticket-type-form';
+import { CreateTicketTypeStepper } from '@/components/shared/create-ticket-type-stepper';
 import { PriceTiersSection } from './price-tiers-section';
-import { Plus, DollarSign, Tag } from 'lucide-react';
+import { Plus, Tag } from 'lucide-react';
 import { Event, Prisma } from '@/prisma/generated/prisma/client';
-import type { TicketTypeFormData } from '@/lib/validations/events';
-import { createTicketTypeAction, deleteTicketTypeAction } from '@/app/actions/events';
+import type { TicketTypeWithPromotionFormData } from '@/lib/validations/events';
+import { createTicketTypeWithPromotionAction, deleteTicketTypeAction } from '@/app/actions/events';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 
@@ -20,7 +19,6 @@ type EventWithTicketTypes = Event & Prisma.EventGetPayload<{
   include: {
     ticketTypes: {
       include: {
-        table: true;
         priceTiers: true;
         _count: {
           select: {
@@ -37,17 +35,6 @@ interface TicketTypesSectionProps {
   event: EventWithTicketTypes;
 }
 
-const kindLabels = {
-  GENERAL: 'General',
-  TABLE: 'Table',
-  SEAT: 'Seat',
-};
-
-const kindColors = {
-  GENERAL: 'bg-blue-500/20 text-blue-400',
-  TABLE: 'bg-purple-500/20 text-purple-400',
-  SEAT: 'bg-green-500/20 text-green-400',
-};
 
 export function TicketTypesSection({ event }: TicketTypesSectionProps) {
   const router = useRouter();
@@ -55,12 +42,12 @@ export function TicketTypesSection({ event }: TicketTypesSectionProps) {
   const [priceTiersDialogOpen, setPriceTiersDialogOpen] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const handleCreateTicketType = async (data: TicketTypeFormData) => {
-    const result = await createTicketTypeAction(event.id, data);
+  const handleCreateTicketType = async (data: TicketTypeWithPromotionFormData) => {
+    const result = await createTicketTypeWithPromotionAction(event.id, data);
     if (result.error) {
       toast.error(result.error);
     } else {
-      toast.success('Ticket type created successfully');
+      toast.success(data.promotion ? 'Ticket type and promotion created' : 'Ticket type created successfully');
       setCreateDialogOpen(false);
       router.refresh();
     }
@@ -100,9 +87,7 @@ export function TicketTypesSection({ event }: TicketTypesSectionProps) {
                 Add a new ticket type to this event
               </DialogDescription>
             </DialogHeader>
-            <TicketTypeForm
-              eventId={event.id}
-              tables={event.tables}
+            <CreateTicketTypeStepper
               onSubmit={handleCreateTicketType}
               onCancel={() => setCreateDialogOpen(false)}
             />
@@ -135,10 +120,8 @@ export function TicketTypesSection({ event }: TicketTypesSectionProps) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Kind</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>Inventory</TableHead>
-                  <TableHead>Table</TableHead>
                   <TableHead>Price Tiers</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -148,24 +131,12 @@ export function TicketTypesSection({ event }: TicketTypesSectionProps) {
                   <TableRow key={ticketType.id}>
                     <TableCell className="font-medium">{ticketType.name}</TableCell>
                     <TableCell>
-                      <Badge className={kindColors[ticketType.kind]}>
-                        {kindLabels[ticketType.kind]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
                       ₱{ticketType.basePrice.toFixed(2)}
                     </TableCell>
                     <TableCell>
                       {ticketType.quantityTotal
                         ? `${ticketType.quantitySold}/${ticketType.quantityTotal}`
                         : 'Unlimited'}
-                    </TableCell>
-                    <TableCell>
-                      {ticketType.table ? (
-                        <span className="text-sm">{ticketType.table.label}</span>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
                     </TableCell>
                     <TableCell>
                       <Button

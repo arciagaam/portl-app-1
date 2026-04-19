@@ -80,7 +80,11 @@ export function TicketsList({ tickets }: TicketsListProps) {
                       </div>
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{ticket.ticketType.name}</span>
+                          <span className="font-medium">
+                            {ticket.table
+                              ? `Table ${ticket.table.label}`
+                              : ticket.ticketType?.name ?? 'Unknown'}
+                          </span>
                           <Badge className={statusColors[ticket.status]}>
                             {statusLabels[ticket.status]}
                           </Badge>

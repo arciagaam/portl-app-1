@@ -105,7 +105,7 @@ export function AttendeesSection({
         <div class="divider"></div>
         <div class="info" style="font-size: 16px; font-weight: 600;">${name}</div>
         <div class="info">${attendee.holderEmail || attendee.order.user.email}</div>
-        <div class="info">${attendee.ticketType.name}</div>
+        <div class="info">${attendee.ticketType?.name ?? 'Unknown'}</div>
         <div class="divider"></div>
         <div class="qr" id="qr-container"></div>
         <div class="ticket-code">${attendee.ticketCode}</div>

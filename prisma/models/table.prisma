@@ -1,27 +1,34 @@
 model Table {
-  id        String          @id @default(cuid())
-  eventId   String
-  label     String          // e.g., "A1", "B2"
-  capacity  Int
-  minSpend  Int?            // Optional minimum spend in PHP
-  notes     String?         @db.Text
-  mode      TableMode       @default(EXCLUSIVE)
-  status    InventoryStatus @default(OPEN)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
+  id              String               @id @default(cuid())
+  eventId         String
+  label           String               // e.g., "A1", "B2"
+  capacity        Int                  // Number of tickets included
+  ticketPrice     Int                  // Price per ticket in PHP
+  requirementType TableRequirementType?
+  minSpend        Int?                 // For MINIMUM_SPEND — consumable amount in PHP
+  bottleCount     Int?                 // For BOTTLE_REQUIREMENT — number of bottles required
+  description     String?              @db.Text
+  imageUrl        String?
+  transferrable   Boolean              @default(false)
+  cancellable     Boolean              @default(false)
+  notes           String?              @db.Text
+  quantitySold    Int                  @default(0)
+  status          InventoryStatus      @default(OPEN)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
-  event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  seats       Seat[]
-  ticketTypes TicketType[] // TABLE and SEAT ticket types can reference this table
+  event      Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  tickets    Ticket[]
 
   @@unique([eventId, label])
   @@index([eventId])
-  @@index([mode])
   @@index([status])
   @@map("tables")
 }
 
-enum TableMode {
-  EXCLUSIVE // Sold as whole table only
-  SHARED    // Seats can be sold individually
+enum TableRequirementType {
+  MINIMUM_SPEND
+  BOTTLE_REQUIREMENT
 }

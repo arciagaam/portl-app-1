@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ClipboardList, Users, TrendingUp, ChevronDown, ChevronRight } from 'lucide-react';
 import { formatPhp } from '@/lib/format';
@@ -13,7 +12,7 @@ interface OrderTicket {
   holderFirstName: string | null;
   holderLastName: string | null;
   holderEmail: string | null;
-  ticketType: { name: string };
+  ticketType: { name: string } | null;
 }
 
 interface OrderItem {
@@ -21,7 +20,7 @@ interface OrderItem {
   quantity: number;
   unitPrice: number;
   totalPrice: number;
-  ticketType: { id: string; name: string; kind: string };
+  ticketType: { id: string; name: string } | null;
 }
 
 interface OrderUser {
@@ -68,42 +67,36 @@ export function OrdersSection({ orders, stats }: OrdersSectionProps) {
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+      <div className="grid gap-px bg-border md:grid-cols-3 border">
+        <div className="bg-background p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Total Orders</span>
             <ClipboardList className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalOrders}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Tickets</CardTitle>
+          </div>
+          <p className="text-3xl font-bold tabular-nums">{stats.totalOrders}</p>
+        </div>
+        <div className="bg-background p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Total Tickets</span>
             <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalTickets}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+          </div>
+          <p className="text-3xl font-bold tabular-nums">{stats.totalTickets}</p>
+        </div>
+        <div className="bg-background p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Total Revenue</span>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatPhp(stats.totalRevenue)}</div>
-          </CardContent>
-        </Card>
+          </div>
+          <p className="text-3xl font-bold tabular-nums">{formatPhp(stats.totalRevenue)}</p>
+        </div>
       </div>
 
       {/* Orders Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Orders</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="border">
+        <div className="px-5 py-4 border-b">
+          <h3 className="font-semibold">Orders</h3>
+        </div>
+        <div className="p-5">
           {orders.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
               <p>No orders yet for this event.</p>
@@ -142,8 +135,8 @@ export function OrdersSection({ orders, stats }: OrdersSectionProps) {
               </table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
@@ -214,7 +207,7 @@ function OrderRow({
                       <td className="py-2 pr-4 font-mono text-xs">
                         {ticket.ticketCode}
                       </td>
-                      <td className="py-2 pr-4">{ticket.ticketType.name}</td>
+                      <td className="py-2 pr-4">{ticket.ticketType?.name ?? 'Unknown'}</td>
                       <td className="py-2 pr-4">
                         {[ticket.holderFirstName, ticket.holderLastName]
                           .filter(Boolean)

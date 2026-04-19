@@ -7,18 +7,16 @@ import {
 } from '@/components/ui/dialog';
 import { TicketTypeForm } from '../ticket-type-form';
 import type { TicketTypeFormData } from '@/lib/validations/events';
-import type { TicketType, EventWithTicketTypes } from './types';
+import type { TicketType } from './types';
 
 interface EditTicketTypeDialogProps {
   ticketType: TicketType;
-  tables: EventWithTicketTypes['tables'];
   onClose: () => void;
   onSubmit: (data: TicketTypeFormData) => Promise<void>;
 }
 
 export function EditTicketTypeDialog({
   ticketType,
-  tables,
   onClose,
   onSubmit,
 }: EditTicketTypeDialogProps) {
@@ -35,14 +33,11 @@ export function EditTicketTypeDialog({
           </DialogDescription>
         </DialogHeader>
         <TicketTypeForm
-          tables={tables}
           defaultValues={{
             name: ticketType.name,
             description: ticketType.description || undefined,
-            kind: ticketType.kind,
             basePrice: ticketType.basePrice,
             quantityTotal: ticketType.quantityTotal ?? undefined,
-            tableId: ticketType.tableId,
             transferrable: ticketType.transferrable,
             cancellable: ticketType.cancellable,
             imageUrl: ticketType.imageUrl,

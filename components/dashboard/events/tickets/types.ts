@@ -4,7 +4,6 @@ export type EventWithTicketTypes = Event & Prisma.EventGetPayload<{
   include: {
     ticketTypes: {
       include: {
-        table: true;
         priceTiers: true;
         _count: {
           select: {
@@ -13,7 +12,6 @@ export type EventWithTicketTypes = Event & Prisma.EventGetPayload<{
         };
       };
     };
-    tables: true;
   };
 }>;
 

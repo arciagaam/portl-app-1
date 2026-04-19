@@ -7,27 +7,19 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import { TableForm } from './table-form';
 import { BulkTableForm } from './bulk-table-form';
-import { SeatsList } from './seats-list';
+import { CreateTableStepper } from '@/components/shared/create-table-stepper';
 import { Plus, Package } from 'lucide-react';
 import { Event, Prisma } from '@/prisma/generated/prisma/client';
-import { createTableAction, bulkCreateTablesAction, deleteTableAction, updateTableCapacityAction, regenerateSeatsAction } from '@/app/actions/events';
+import { createTableWithPromotionAction, bulkCreateTablesAction, deleteTableAction } from '@/app/actions/events';
+import type { TableWithPromotionFormData } from '@/lib/validations/events';
+import { formatPhp } from '@/lib/format';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 
 type EventWithTables = Event & Prisma.EventGetPayload<{
   include: {
-    tables: {
-      include: {
-        seats: true;
-        _count: {
-          select: {
-            ticketTypes: true;
-          };
-        };
-      };
-    };
+    tables: true;
   };
 }>;
 
@@ -39,20 +31,20 @@ export function TablesSection({ event }: TablesSectionProps) {
   const router = useRouter();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
-  const [seatsDialogOpen, setSeatsDialogOpen] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const handleCreateTable = async (data: any) => {
-    const result = await createTableAction(event.id, data);
+  const handleCreateTable = async (data: TableWithPromotionFormData) => {
+    const result = await createTableWithPromotionAction(event.id, data);
     if (result.error) {
       toast.error(result.error);
     } else {
-      toast.success('Table created successfully');
+      toast.success(data.promotion ? 'Table and promotion created' : 'Table created successfully');
       setCreateDialogOpen(false);
       router.refresh();
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleBulkCreate = async (data: any) => {
     const result = await bulkCreateTablesAction(event.id, data);
     if (result.error) {
@@ -76,23 +68,13 @@ export function TablesSection({ event }: TablesSectionProps) {
     }
   };
 
-  const handleRegenerateSeats = async (tableId: string) => {
-    const result = await regenerateSeatsAction(tableId);
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success('Seats regenerated successfully');
-      router.refresh();
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">Tables & Seats</h2>
+          <h2 className="text-2xl font-semibold">Tables</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Manage tables and their seat configurations
+            Manage table configurations
           </p>
         </div>
         <div className="flex gap-2">
@@ -124,15 +106,14 @@ export function TablesSection({ event }: TablesSectionProps) {
                 Create Table
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create Table</DialogTitle>
                 <DialogDescription>
                   Add a new table to this event
                 </DialogDescription>
               </DialogHeader>
-              <TableForm
-                eventId={event.id}
+              <CreateTableStepper
                 onSubmit={handleCreateTable}
                 onCancel={() => setCreateDialogOpen(false)}
               />
@@ -166,11 +147,11 @@ export function TablesSection({ event }: TablesSectionProps) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Label</TableHead>
-                  <TableHead>Mode</TableHead>
                   <TableHead>Capacity</TableHead>
-                  <TableHead>Seats</TableHead>
-                  <TableHead>Min Spend</TableHead>
-                  <TableHead>Ticket Types</TableHead>
+                  <TableHead>Ticket Price</TableHead>
+                  <TableHead>Requirement</TableHead>
+                  <TableHead>Sold</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -178,40 +159,29 @@ export function TablesSection({ event }: TablesSectionProps) {
                 {event.tables.map((table) => (
                   <TableRow key={table.id}>
                     <TableCell className="font-medium">{table.label}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{table.mode}</Badge>
-                    </TableCell>
                     <TableCell>{table.capacity}</TableCell>
+                    <TableCell>{formatPhp(table.ticketPrice)}</TableCell>
+                    <TableCell>
+                      {table.requirementType === 'MINIMUM_SPEND' && table.minSpend != null ? (
+                        <Badge variant="secondary">Min Spend: {formatPhp(table.minSpend)}</Badge>
+                      ) : table.requirementType === 'BOTTLE_REQUIREMENT' && table.bottleCount != null ? (
+                        <Badge variant="secondary">{table.bottleCount} bottle{table.bottleCount !== 1 ? 's' : ''}</Badge>
+                      ) : (
+                        '—'
+                      )}
+                    </TableCell>
+                    <TableCell>{table.quantitySold}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{table.status}</Badge>
+                    </TableCell>
                     <TableCell>
                       <Button
-                        variant="link"
+                        variant="destructive"
                         size="sm"
-                        onClick={() => setSeatsDialogOpen(table.id)}
+                        onClick={() => setDeleteTarget(table.id)}
                       >
-                        {table.seats.length} seats
+                        Delete
                       </Button>
-                    </TableCell>
-                    <TableCell>
-                      {table.minSpend ? `$${(table.minSpend / 100).toFixed(2)}` : '—'}
-                    </TableCell>
-                    <TableCell>{table._count.ticketTypes}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRegenerateSeats(table.id)}
-                        >
-                          Regenerate Seats
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => setDeleteTarget(table.id)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -225,30 +195,11 @@ export function TablesSection({ event }: TablesSectionProps) {
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         title="Delete table"
-        description="Are you sure you want to delete this table? This will also delete all seats."
+        description="Are you sure you want to delete this table? This action cannot be undone."
         confirmLabel="Delete"
         variant="destructive"
         onConfirm={() => deleteTarget && handleDeleteTable(deleteTarget)}
       />
-
-      {seatsDialogOpen && (
-        <Dialog open={!!seatsDialogOpen} onOpenChange={(open) => !open && setSeatsDialogOpen(null)}>
-          <DialogContent className="max-w-4xl">
-            <DialogHeader>
-              <DialogTitle>Seats</DialogTitle>
-              <DialogDescription>
-                View and manage seats for this table
-              </DialogDescription>
-            </DialogHeader>
-            {event.tables.find(t => t.id === seatsDialogOpen) && (
-              <SeatsList
-                table={event.tables.find(t => t.id === seatsDialogOpen)!}
-                onRegenerate={handleRegenerateSeats}
-              />
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }

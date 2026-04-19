@@ -6,7 +6,7 @@ export interface Attendee {
   holderFirstName: string | null;
   holderLastName: string | null;
   holderEmail: string | null;
-  ticketType: { id: string; name: string; kind: string };
+  ticketType: { id: string; name: string } | null;
   order: {
     orderNumber: string;
     user: {

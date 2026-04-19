@@ -18,6 +18,7 @@ const cookieDomain = (() => {
 })();
 
 export const config = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   adapter: PrismaAdapter(prisma) as any,
   providers: [
     Credentials({
@@ -117,6 +118,7 @@ export const config = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         session.user.role = token.role as any;
       }
       return session;

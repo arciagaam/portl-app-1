@@ -26,11 +26,29 @@ export type EventFormData = z.infer<typeof eventSchema>;
 // Table validation
 export const tableSchema = z.object({
   label: z.string().min(1, 'Table label is required'),
+  description: z.string().optional(),
+  imageUrl: z.string().url().optional().nullable(),
   capacity: z.number().int().positive('Capacity must be a positive integer'),
-  minSpend: z.number().int().nonnegative().optional(),
+  ticketPrice: z.number().int().nonnegative('Ticket price must be non-negative'),
+  requirementType: z.enum(['MINIMUM_SPEND', 'BOTTLE_REQUIREMENT']).optional().nullable(),
+  minSpend: z.number().int().nonnegative().optional().nullable(),
+  bottleCount: z.number().int().positive().optional().nullable(),
+  transferrable: z.boolean(),
+  cancellable: z.boolean(),
   notes: z.string().optional(),
-  mode: z.enum(['EXCLUSIVE', 'SHARED']),
   status: z.enum(['OPEN', 'CLOSED', 'HIDDEN']).optional(),
+}).refine((data) => {
+  if (data.requirementType === 'MINIMUM_SPEND') return !!data.minSpend;
+  return true;
+}, {
+  message: 'Minimum spend is required',
+  path: ['minSpend'],
+}).refine((data) => {
+  if (data.requirementType === 'BOTTLE_REQUIREMENT') return !!data.bottleCount;
+  return true;
+}, {
+  message: 'Bottle count is required',
+  path: ['bottleCount'],
 });
 
 export type TableFormData = z.infer<typeof tableSchema>;
@@ -40,12 +58,30 @@ export const bulkTableSchema = z.object({
   prefix: z.string().min(1, 'Prefix is required'),
   startNumber: z.number().int().positive('Start number must be positive'),
   endNumber: z.number().int().positive('End number must be positive'),
+  description: z.string().optional(),
+  imageUrl: z.string().url().optional().nullable(),
   capacity: z.number().int().positive('Capacity must be a positive integer'),
-  minSpend: z.number().int().nonnegative().optional(),
-  mode: z.enum(['EXCLUSIVE', 'SHARED']),
+  ticketPrice: z.number().int().nonnegative('Ticket price must be non-negative'),
+  requirementType: z.enum(['MINIMUM_SPEND', 'BOTTLE_REQUIREMENT']).optional().nullable(),
+  minSpend: z.number().int().nonnegative().optional().nullable(),
+  bottleCount: z.number().int().positive().optional().nullable(),
+  transferrable: z.boolean(),
+  cancellable: z.boolean(),
 }).refine((data) => data.endNumber >= data.startNumber, {
   message: 'End number must be greater than or equal to start number',
   path: ['endNumber'],
+}).refine((data) => {
+  if (data.requirementType === 'MINIMUM_SPEND') return !!data.minSpend;
+  return true;
+}, {
+  message: 'Minimum spend is required',
+  path: ['minSpend'],
+}).refine((data) => {
+  if (data.requirementType === 'BOTTLE_REQUIREMENT') return !!data.bottleCount;
+  return true;
+}, {
+  message: 'Bottle count is required',
+  path: ['bottleCount'],
 });
 
 export type BulkTableFormData = z.infer<typeof bulkTableSchema>;
@@ -54,22 +90,12 @@ export type BulkTableFormData = z.infer<typeof bulkTableSchema>;
 export const ticketTypeSchema = z.object({
   name: z.string().min(1, 'Ticket type name is required'),
   description: z.string().optional(),
-  kind: z.enum(['GENERAL', 'TABLE', 'SEAT']),
   basePrice: z.number().int().nonnegative('Price must be non-negative'),
   quantityTotal: z.number().int().positive().optional(),
   transferrable: z.boolean(),
   cancellable: z.boolean(),
-  tableId: z.string().optional().nullable(),
   imageUrl: z.string().url().optional().nullable(),
   status: z.enum(['OPEN', 'CLOSED', 'HIDDEN']).optional(),
-}).refine((data) => {
-  if (data.kind === 'TABLE' || data.kind === 'SEAT') {
-    return !!data.tableId;
-  }
-  return true;
-}, {
-  message: 'Table is required for TABLE and SEAT ticket types',
-  path: ['tableId'],
 });
 
 export type TicketTypeFormData = z.infer<typeof ticketTypeSchema>;
@@ -111,35 +137,66 @@ export const priceTierSchema = z.object({
 
 export type PriceTierFormData = z.infer<typeof priceTierSchema>;
 
-// Promotion validation
-export const promotionSchema = z.object({
+// Inline voucher code (for creating codes alongside a promotion)
+export const inlineVoucherCodeSchema = z.object({
+  code: z.string().min(1, 'Code is required').regex(/^[A-Z0-9-_]+$/i, 'Letters, numbers, hyphens, underscores only'),
+  maxRedemptions: z.number().int().positive().optional().nullable(),
+});
+
+export type InlineVoucherCodeFormData = z.infer<typeof inlineVoucherCodeSchema>;
+
+// Inline promotion (used in ticket/table stepper and standalone form)
+// Uses plain percentages (0-100) instead of basis points; server converts before DB write
+export const inlinePromotionSchema = z.object({
   name: z.string().min(1, 'Promotion name is required'),
   description: z.string().optional(),
   requiresCode: z.boolean(),
   discountType: z.enum(['PERCENT', 'FIXED']),
-  discountValue: z.number().int().nonnegative('Discount value must be non-negative'),
+  discountValue: z.number().nonnegative('Discount value must be non-negative'),
   appliesTo: z.enum(['ORDER', 'ITEM']),
-  validFrom: z.string().datetime({ message: 'Valid from date is required' }),
-  validUntil: z.string().datetime({ message: 'Valid until date is required' }),
+  validFrom: z.string().optional().or(z.literal('')),
+  validUntil: z.string().optional().or(z.literal('')),
   maxRedemptions: z.number().int().positive().optional().nullable(),
   maxPerUser: z.number().int().positive().optional().nullable(),
   ticketTypeIds: z.array(z.string()).optional(),
+  codes: z.array(inlineVoucherCodeSchema).optional(),
 }).refine((data) => {
   if (data.discountType === 'PERCENT') {
-    return data.discountValue <= 10000; // Max 100% (10000 basis points)
+    return data.discountValue <= 100;
   }
   return true;
 }, {
   message: 'Percent discount cannot exceed 100%',
   path: ['discountValue'],
 }).refine((data) => {
-  return new Date(data.validFrom) < new Date(data.validUntil);
+  if (data.validFrom && data.validUntil) {
+    return new Date(data.validFrom) < new Date(data.validUntil);
+  }
+  return true;
 }, {
   message: 'Valid until date must be after valid from date',
   path: ['validUntil'],
 });
 
-export type PromotionFormData = z.infer<typeof promotionSchema>;
+export type InlinePromotionFormData = z.infer<typeof inlinePromotionSchema>;
+
+// Legacy promotion schema (kept for backward compat with existing reads)
+export const promotionSchema = inlinePromotionSchema;
+export type PromotionFormData = InlinePromotionFormData;
+
+// Combined ticket type + optional promotion
+export const ticketTypeWithPromotionSchema = ticketTypeSchema.and(z.object({
+  promotion: inlinePromotionSchema.optional(),
+}));
+
+export type TicketTypeWithPromotionFormData = z.infer<typeof ticketTypeWithPromotionSchema>;
+
+// Combined table + optional promotion
+export const tableWithPromotionSchema = tableSchema.and(z.object({
+  promotion: inlinePromotionSchema.optional(),
+}));
+
+export type TableWithPromotionFormData = z.infer<typeof tableWithPromotionSchema>;
 
 // Event Promoter validation
 export const eventPromoterSchema = z.object({

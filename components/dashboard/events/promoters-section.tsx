@@ -129,10 +129,8 @@ export function PromotersSection({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">Promoters</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Assign hosts and promoters with unique promo codes to track their performance
-          </p>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">Management</p>
+          <h2 className="text-2xl font-semibold tracking-tight">Promoters</h2>
         </div>
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogTrigger asChild>

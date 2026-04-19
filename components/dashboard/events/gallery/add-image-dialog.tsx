@@ -78,7 +78,7 @@ export function AddImageDialog({ eventId, tenantSubdomain, disabled, open, onOpe
         <DialogHeader>
           <DialogTitle>Add Gallery Image</DialogTitle>
           <DialogDescription>
-            Upload an image to add to this event's gallery
+            Upload an image to add to this event&apos;s gallery
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">

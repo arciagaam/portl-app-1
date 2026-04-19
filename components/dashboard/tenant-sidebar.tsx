@@ -44,66 +44,57 @@ export default function TenantSidebar({
   const canSeeRoles = has('manage_roles')
   const canSeePageSettings = has('manage_page')
 
+  const navLinkClass = (isActive: boolean) =>
+    cn(
+      'flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors relative',
+      isActive
+        ? 'bg-foreground/10 text-foreground before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:bg-foreground'
+        : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5'
+    )
+
+  const lockedClass = 'flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-muted-foreground/40 cursor-not-allowed'
+
   return (
-    <aside className="w-64 border-r bg-background flex flex-col h-screen">
+    <aside className="w-64 border-r border-sidebar-border bg-sidebar flex flex-col h-screen">
       {/* Logo */}
-      <div className="p-6 border-b">
+      <div className="px-5 py-5 border-b border-sidebar-border">
         <Link href="/account">
           <Image
             src="/images/logo/portl-logo-white.svg"
             alt="Portl Logo"
             width={80}
             height={32}
-            className="h-8 w-auto"
+            className="h-6 w-auto opacity-90 hover:opacity-100 transition-opacity"
           />
         </Link>
       </div>
 
       {/* Tenant Context */}
-      <div className="p-4 border-b">
-        <p className="text-sm font-semibold text-foreground truncate">
+      <div className="px-5 py-4 border-b border-sidebar-border">
+        <p className="text-xs font-semibold uppercase tracking-widest text-foreground truncate">
           {tenantSubdomain}
         </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground mt-0.5 font-mono">
           {tenantSubdomain}.{process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost'}
         </p>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
-        <Link
-          href={homePath}
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-            isHomeActive
-              ? "bg-accent text-accent-foreground"
-              : "hover:bg-accent hover:text-accent-foreground text-foreground"
-          )}
-        >
+      <nav className="flex-1 px-3 py-4 space-y-0.5">
+        <Link href={homePath} className={navLinkClass(isHomeActive)}>
           <Home className="h-4 w-4" />
           Home
         </Link>
 
         {isApproved && canSeeEvents ? (
-          <Link
-            href={eventsPath}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-              isEventsActive
-                ? "bg-accent text-accent-foreground"
-                : "hover:bg-accent hover:text-accent-foreground text-foreground"
-            )}
-          >
+          <Link href={eventsPath} className={navLinkClass(isEventsActive)}>
             <Calendar className="h-4 w-4" />
             Events
           </Link>
         ) : (
           <div
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium",
-              "text-muted-foreground cursor-not-allowed opacity-60"
-            )}
-            title={!isApproved ? "Available after application approval" : "Requires View Events permission"}
+            className={lockedClass}
+            title={!isApproved ? 'Available after application approval' : 'Requires View Events permission'}
           >
             <Lock className="h-4 w-4" />
             Events
@@ -111,56 +102,26 @@ export default function TenantSidebar({
         )}
 
         {isApproved && canSeeTeam && (
-          <Link
-            href={teamPath}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-              isTeamActive
-                ? "bg-accent text-accent-foreground"
-                : "hover:bg-accent hover:text-accent-foreground text-foreground"
-            )}
-          >
+          <Link href={teamPath} className={navLinkClass(isTeamActive)}>
             <Users className="h-4 w-4" />
             Team
           </Link>
         )}
 
         {isApproved && canSeeRoles && (
-          <Link
-            href={rolesPath}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-              isRolesActive
-                ? "bg-accent text-accent-foreground"
-                : "hover:bg-accent hover:text-accent-foreground text-foreground"
-            )}
-          >
+          <Link href={rolesPath} className={navLinkClass(isRolesActive)}>
             <Shield className="h-4 w-4" />
             Roles
           </Link>
         )}
 
         {isApproved && canSeePageSettings ? (
-          <Link
-            href={pageSettingsPath}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-              isPageSettingsActive
-                ? "bg-accent text-accent-foreground"
-                : "hover:bg-accent hover:text-accent-foreground text-foreground"
-            )}
-          >
+          <Link href={pageSettingsPath} className={navLinkClass(isPageSettingsActive)}>
             <Globe className="h-4 w-4" />
             Page
           </Link>
         ) : canSeePageSettings ? (
-          <div
-            className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium",
-              "text-muted-foreground cursor-not-allowed opacity-60"
-            )}
-            title="Available after application approval"
-          >
+          <div className={lockedClass} title="Available after application approval">
             <Lock className="h-4 w-4" />
             Page
           </div>
@@ -168,13 +129,10 @@ export default function TenantSidebar({
       </nav>
 
       {/* Back to Profile */}
-      <div className="p-4 border-t">
+      <div className="px-3 py-3 border-t border-sidebar-border">
         <Link
           href="/account"
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-            "hover:bg-accent hover:text-accent-foreground text-muted-foreground"
-          )}
+          className="flex items-center gap-3 px-3 py-2 text-sm font-medium transition-colors text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Profile
@@ -182,14 +140,14 @@ export default function TenantSidebar({
       </div>
 
       {/* User Info & Logout */}
-      <div className="p-4 border-t">
+      <div className="px-5 py-4 border-t border-sidebar-border">
         {(userName || userEmail) && (
           <div className="mb-3">
-            <p className="text-sm font-medium text-foreground">
+            <p className="text-sm font-medium text-foreground truncate">
               {userName || userEmail}
             </p>
             {userEmail && userName && (
-              <p className="text-xs text-muted-foreground truncate">
+              <p className="text-[11px] text-muted-foreground truncate mt-0.5">
                 {userEmail}
               </p>
             )}

@@ -44,8 +44,12 @@ export function AttendeeForm({
   onContinue,
   onBack,
 }: AttendeeFormProps) {
-  // Calculate total tickets
-  const totalTickets = order.items.reduce((sum, item) => sum + item.quantity, 0);
+  // Calculate total attendee slots
+  // For table items, use table capacity (quantity is always 1 for tables)
+  const totalTickets = order.items.reduce(
+    (sum, item) => sum + (item.table ? item.table.capacity : item.quantity),
+    0
+  );
 
   // Initialize attendees state
   const [attendees, setAttendees] = useState<AttendeeData[]>(() =>
@@ -125,9 +129,14 @@ export function AttendeeForm({
   const getTicketLabel = (ticketIndex: number): string => {
     let count = 0;
     for (const item of order.items) {
-      for (let i = 0; i < item.quantity; i++) {
+      const slots = item.table ? item.table.capacity : item.quantity;
+      for (let i = 0; i < slots; i++) {
         if (count === ticketIndex) {
-          return `${item.ticketType.name}${item.quantity > 1 ? ` #${i + 1}` : ''}`;
+          if (item.table) {
+            return `Table ${item.table.label} - Seat ${i + 1}`;
+          }
+          const name = item.ticketType?.name ?? 'Unknown item';
+          return `${name}${slots > 1 ? ` #${i + 1}` : ''}`;
         }
         count++;
       }

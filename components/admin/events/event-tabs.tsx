@@ -8,19 +8,9 @@ import { Event, Prisma } from '@/prisma/generated/prisma/client';
 
 type EventWithRelations = Event & Prisma.EventGetPayload<{
   include: {
-    tables: {
-      include: {
-        seats: true;
-        _count: {
-          select: {
-            ticketTypes: true;
-          };
-        };
-      };
-    };
+    tables: true;
     ticketTypes: {
       include: {
-        table: true;
         priceTiers: true;
         _count: {
           select: {

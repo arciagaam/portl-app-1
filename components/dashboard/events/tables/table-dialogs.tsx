@@ -11,15 +11,16 @@ import {
 } from '@/components/ui/dialog';
 import { TableForm } from '../table-form';
 import { BulkTableForm } from '../bulk-table-form';
+import { CreateTableStepper } from '@/components/shared/create-table-stepper';
 import { Plus, Package } from 'lucide-react';
 import type { TableItem } from './types';
-import type { TableFormData } from '@/lib/validations/events';
+import type { TableFormData, TableWithPromotionFormData } from '@/lib/validations/events';
 import type { bulkCreateTablesForTenantAction } from '@/app/actions/tenant-events';
 
 interface CreateTableDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: TableFormData) => Promise<void>;
+  onSubmit: (data: TableWithPromotionFormData) => Promise<void>;
 }
 
 export function CreateTableDialog({ open, onOpenChange, onSubmit }: CreateTableDialogProps) {
@@ -31,14 +32,14 @@ export function CreateTableDialog({ open, onOpenChange, onSubmit }: CreateTableD
           Add Table
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Table</DialogTitle>
           <DialogDescription>
             Add a new table to this event
           </DialogDescription>
         </DialogHeader>
-        <TableForm
+        <CreateTableStepper
           onSubmit={onSubmit}
           onCancel={() => onOpenChange(false)}
         />
@@ -98,9 +99,15 @@ export function EditTableDialog({ editingTable, onOpenChange, onSubmit }: EditTa
           <TableForm
             defaultValues={{
               label: editingTable.label,
+              description: editingTable.description ?? undefined,
+              imageUrl: editingTable.imageUrl ?? undefined,
               capacity: editingTable.capacity,
-              mode: editingTable.mode,
+              ticketPrice: editingTable.ticketPrice,
+              requirementType: editingTable.requirementType ?? undefined,
               minSpend: editingTable.minSpend ?? undefined,
+              bottleCount: editingTable.bottleCount ?? undefined,
+              transferrable: editingTable.transferrable,
+              cancellable: editingTable.cancellable,
               notes: editingTable.notes ?? undefined,
             }}
             onSubmit={onSubmit}

@@ -145,7 +145,11 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                                             <Ticket className="h-5 w-5 text-primary" />
                                         </div>
                                         <div>
-                                            <p className="font-medium">{ticket.ticketType.name}</p>
+                                            <p className="font-medium">
+                                                {ticket.table
+                                                    ? `Table ${ticket.table.label}`
+                                                    : ticket.ticketType?.name ?? 'Unknown'}
+                                            </p>
                                             <p className="text-sm text-muted-foreground">
                                                 {ticket.holderFirstName
                                                     ? `${ticket.holderFirstName} ${ticket.holderLastName}`
@@ -182,7 +186,9 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                             {order.items.map((item) => (
                                 <div key={item.id} className="flex justify-between text-sm">
                                     <span>
-                                        {item.ticketType.name} x {item.quantity}
+                                        {item.table
+                                            ? `Table ${item.table.label}`
+                                            : item.ticketType?.name ?? 'Unknown'} x {item.quantity}
                                     </span>
                                     <span>PHP {item.totalPrice.toLocaleString()}</span>
                                 </div>

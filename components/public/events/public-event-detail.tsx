@@ -2,19 +2,22 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Calendar, Clock, MapPin } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Calendar, Clock, MapPin, Ticket, UtensilsCrossed } from 'lucide-react';
 import { TicketTypesDisplay } from './ticket-types-display';
-import type { Event, EventImage, TicketType, TicketTypePriceTier } from '@/prisma/generated/prisma/client';
+import { TablesDisplay } from './tables-display';
+import type { Event, EventImage, TicketType, TicketTypePriceTier, Table } from '@/prisma/generated/prisma/client';
 
-type EventWithTicketTypes = Event & {
+type EventWithRelations = Event & {
   ticketTypes: (TicketType & {
     priceTiers: TicketTypePriceTier[];
   })[];
+  tables: Table[];
   images: EventImage[];
 };
 
 interface PublicEventDetailProps {
-  event: EventWithTicketTypes;
+  event: EventWithRelations;
   tenantSubdomain: string;
   tenantName: string;
 }
@@ -110,11 +113,32 @@ export function PublicEventDetail({ event, tenantSubdomain, tenantName }: Public
             </div>
           )}
 
-          {/* Tickets */}
-          <div>
-            <h2 className="text-xl font-semibold mb-4">Tickets</h2>
-            <TicketTypesDisplay eventId={event.id} ticketTypes={event.ticketTypes} />
-          </div>
+          {/* Tickets & Tables */}
+          {event.tables.length > 0 ? (
+            <Tabs defaultValue="tickets">
+              <TabsList className="w-full">
+                <TabsTrigger value="tickets" className="flex-1">
+                  <Ticket className="h-4 w-4 mr-2" />
+                  Tickets
+                </TabsTrigger>
+                <TabsTrigger value="tables" className="flex-1">
+                  <UtensilsCrossed className="h-4 w-4 mr-2" />
+                  Tables
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="tickets">
+                <TicketTypesDisplay eventId={event.id} ticketTypes={event.ticketTypes} />
+              </TabsContent>
+              <TabsContent value="tables">
+                <TablesDisplay eventId={event.id} tables={event.tables} />
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <div>
+              <h2 className="text-xl font-semibold mb-4">Tickets</h2>
+              <TicketTypesDisplay eventId={event.id} ticketTypes={event.ticketTypes} />
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}

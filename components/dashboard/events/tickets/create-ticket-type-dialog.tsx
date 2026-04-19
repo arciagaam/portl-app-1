@@ -7,22 +7,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { TicketTypeForm } from '../ticket-type-form';
+import { CreateTicketTypeStepper } from '@/components/shared/create-ticket-type-stepper';
 import { Plus } from 'lucide-react';
-import type { TicketTypeFormData } from '@/lib/validations/events';
-import type { EventWithTicketTypes } from './types';
+import type { TicketTypeWithPromotionFormData } from '@/lib/validations/events';
 
 interface CreateTicketTypeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tables: EventWithTicketTypes['tables'];
-  onSubmit: (data: TicketTypeFormData) => Promise<void>;
+  onSubmit: (data: TicketTypeWithPromotionFormData) => Promise<void>;
 }
 
 export function CreateTicketTypeDialog({
   open,
   onOpenChange,
-  tables,
   onSubmit,
 }: CreateTicketTypeDialogProps) {
   return (
@@ -33,15 +30,14 @@ export function CreateTicketTypeDialog({
           Add Ticket Type
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Ticket Type</DialogTitle>
           <DialogDescription>
             Create a new ticket type for this event
           </DialogDescription>
         </DialogHeader>
-        <TicketTypeForm
-          tables={tables}
+        <CreateTicketTypeStepper
           onSubmit={onSubmit}
           onCancel={() => onOpenChange(false)}
         />

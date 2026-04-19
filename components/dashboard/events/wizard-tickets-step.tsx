@@ -13,13 +13,12 @@ import { TicketTypeForm } from '@/components/dashboard/events/ticket-type-form';
 import { createTicketTypeForTenantAction } from '@/app/actions/tenant-events';
 import { Plus, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Table, TicketType } from '@/prisma/generated/prisma/client';
+import type { TicketType } from '@/prisma/generated/prisma/client';
 import type { TicketTypeFormData } from '@/lib/validations/events';
 
 interface WizardTicketsStepProps {
   tenantSubdomain: string;
   eventId: string;
-  tables: Table[];
   ticketTypes: TicketType[];
   onTicketTypeCreated: (ticketType: TicketType) => void;
   onBack: () => void;
@@ -29,7 +28,6 @@ interface WizardTicketsStepProps {
 export function WizardTicketsStep({
   tenantSubdomain,
   eventId,
-  tables,
   ticketTypes,
   onTicketTypeCreated,
   onBack,
@@ -74,7 +72,6 @@ export function WizardTicketsStep({
             <DialogTitle>Add Ticket Type</DialogTitle>
           </DialogHeader>
           <TicketTypeForm
-            tables={tables}
             onSubmit={handleCreateTicketType}
             onCancel={() => setShowAddDialog(false)}
           />
@@ -95,7 +92,7 @@ export function WizardTicketsStep({
               <div className="flex-1 min-w-0">
                 <p className="font-medium">{tt.name}</p>
                 <p className="text-sm text-muted-foreground">
-                  {tt.kind} &middot; {formatPrice(tt.basePrice)}
+                  {formatPrice(tt.basePrice)}
                 </p>
               </div>
             </div>

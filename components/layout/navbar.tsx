@@ -4,7 +4,7 @@ import { HeaderActions } from './header-actions';
 
 export default async function Navbar() {
   return (
-    <nav className="bg-background fixed top-0 w-full px-6 md:px-12 py-4 flex items-center justify-between z-50">
+    <nav className="fixed top-0 w-full px-6 md:px-12 py-4 flex items-center justify-between z-50 bg-background/80 backdrop-blur-sm">
       {/* Logo */}
       <div className="flex items-center">
         <Link href="/">
@@ -21,28 +21,22 @@ export default async function Navbar() {
       {/* Navigation Links */}
       <div className="hidden md:flex items-center gap-6 text-sm">
         <Link
-          href="/"
+          href="#highlights"
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
-          Home
+          Experiences
         </Link>
         <Link
-          href="#about"
+          href="#highlights"
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
-          About Us
-        </Link>
-        <Link
-          href="#services"
-          className="text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Services
+          Events
         </Link>
         <Link
           href="#faq"
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
-          FAQ
+          Venues
         </Link>
       </div>
 

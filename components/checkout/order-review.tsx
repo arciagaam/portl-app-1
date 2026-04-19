@@ -71,7 +71,11 @@ export function OrderReview({ order, onContinue, onOrderUpdate }: OrderReviewPro
             {order.items.map((item) => (
               <div key={item.id} className="flex justify-between items-start">
                 <div>
-                  <p className="font-medium">{item.ticketType.name}</p>
+                  <p className="font-medium">
+                    {item.table
+                      ? `Table ${item.table.label} (${item.table.capacity} seats)`
+                      : item.ticketType?.name ?? 'Unknown item'}
+                  </p>
                   <p className="text-sm text-muted-foreground">
                     {item.quantity} x {formatPhp(item.unitPrice)}
                   </p>

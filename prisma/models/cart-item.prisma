@@ -2,23 +2,23 @@ model CartItem {
   id           String   @id @default(cuid())
   cartId       String
   eventId      String   // For grouping by tenant at checkout
-  ticketTypeId String
+  ticketTypeId String?  // For ticket purchases
+  tableId      String?  // For table purchases
   priceTierId  String?  // Locked price tier at time of adding
   quantity     Int      @default(1)
   unitPrice    Int      // Locked price in PHP at time of adding
-  seatId       String?  // For SEAT tickets - reserved seat
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   cart       Cart                  @relation(fields: [cartId], references: [id], onDelete: Cascade)
   event      Event                 @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  ticketType TicketType            @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+  ticketType TicketType?           @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+  table      Table?                @relation(fields: [tableId], references: [id], onDelete: Cascade)
   priceTier  TicketTypePriceTier?  @relation(fields: [priceTierId], references: [id], onDelete: SetNull)
-  seat       Seat?                 @relation(fields: [seatId], references: [id], onDelete: SetNull)
 
-  @@unique([cartId, ticketTypeId, seatId])
   @@index([cartId])
   @@index([cartId, eventId])
   @@index([ticketTypeId])
+  @@index([tableId])
   @@map("cart_items")
 }

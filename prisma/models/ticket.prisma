@@ -4,8 +4,8 @@ model Ticket {
   orderId         String
   orderItemId     String
   eventId         String
-  ticketTypeId    String
-  seatId          String?      // For SEAT tickets
+  ticketTypeId    String?      // For ticket-type purchases
+  tableId         String?      // For table purchases
 
   // Ownership
   ownerId         String       // Purchaser (from order)
@@ -27,8 +27,8 @@ model Ticket {
   order      Order      @relation(fields: [orderId], references: [id], onDelete: Restrict)
   orderItem  OrderItem  @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
   event      Event      @relation(fields: [eventId], references: [id], onDelete: Restrict)
-  ticketType TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
-  seat       Seat?      @relation(fields: [seatId], references: [id], onDelete: SetNull)
+  ticketType TicketType? @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+  table      Table?     @relation(fields: [tableId], references: [id], onDelete: Restrict)
   owner      User       @relation("TicketOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   holder     User?      @relation("TicketHolder", fields: [holderId], references: [id], onDelete: SetNull)
 
@@ -36,6 +36,7 @@ model Ticket {
   @@index([orderItemId])
   @@index([eventId])
   @@index([ticketTypeId])
+  @@index([tableId])
   @@index([ownerId])
   @@index([holderId])
   @@index([ticketCode])

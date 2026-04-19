@@ -110,7 +110,12 @@ export function PaymentPlaceholder({
               </div>
               {order.items.map((item) => (
                 <div key={item.id} className="flex justify-between text-sm">
-                  <span>{item.ticketType.name} x {item.quantity}</span>
+                  <span>
+                    {item.table
+                      ? `Table ${item.table.label} (${item.table.capacity} seats)`
+                      : item.ticketType?.name ?? 'Unknown item'}{' '}
+                    x {item.quantity}
+                  </span>
                   <span>PHP {item.totalPrice.toLocaleString()}</span>
                 </div>
               ))}

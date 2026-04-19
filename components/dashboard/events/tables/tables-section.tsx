@@ -4,17 +4,16 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  createTableForTenantAction,
+  createTableWithPromotionForTenantAction,
   bulkCreateTablesForTenantAction,
   deleteTableForTenantAction,
   updateTableForTenantAction,
-  regenerateSeatsForTenantAction,
   updateTableStatusForTenantAction,
 } from '@/app/actions/tenant-events';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
-import type { TableFormData } from '@/lib/validations/events';
+import type { TableFormData, TableWithPromotionFormData } from '@/lib/validations/events';
 import type { TablesSectionProps, TableItem } from './types';
-import { groupTablesByTicketType, getSortedGroupNames } from './table-utils';
+import { groupTablesByRequirementType, getSortedGroupNames } from './table-utils';
 import { CreateTableDialog, BulkCreateTableDialog, EditTableDialog } from './table-dialogs';
 import { EmptyTablesState } from './empty-tables-state';
 import { TableGroup } from './table-group';
@@ -26,10 +25,9 @@ export function TablesSection({ event, tenantSubdomain }: TablesSectionProps) {
   const [editingTable, setEditingTable] = useState<TableItem | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [isRegenerating, setIsRegenerating] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const groupMap = groupTablesByTicketType(event.tables);
+  const groupMap = groupTablesByRequirementType(event.tables);
   const groupNames = getSortedGroupNames(groupMap);
 
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set(groupNames));
@@ -43,12 +41,12 @@ export function TablesSection({ event, tenantSubdomain }: TablesSectionProps) {
     });
   };
 
-  const handleCreateTable = async (data: TableFormData) => {
-    const result = await createTableForTenantAction(tenantSubdomain, event.id, data);
+  const handleCreateTable = async (data: TableWithPromotionFormData) => {
+    const result = await createTableWithPromotionForTenantAction(tenantSubdomain, event.id, data);
     if ('error' in result) {
       toast.error(result.error);
     } else {
-      toast.success('Table created successfully');
+      toast.success(data.promotion ? 'Table and promotion created' : 'Table created successfully');
       setCreateDialogOpen(false);
       router.refresh();
     }
@@ -92,18 +90,6 @@ export function TablesSection({ event, tenantSubdomain }: TablesSectionProps) {
     }
   };
 
-  const handleRegenerateSeats = async (tableId: string) => {
-    setIsRegenerating(tableId);
-    const result = await regenerateSeatsForTenantAction(tenantSubdomain, tableId);
-    setIsRegenerating(null);
-    if ('error' in result) {
-      toast.error(result.error);
-    } else {
-      toast.success('Seats regenerated successfully');
-      router.refresh();
-    }
-  };
-
   const handleToggleStatus = (tableId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'HIDDEN' ? 'OPEN' : 'HIDDEN';
     startTransition(async () => {
@@ -121,10 +107,8 @@ export function TablesSection({ event, tenantSubdomain }: TablesSectionProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">Tables & Seats</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage tables and their seat configurations for this event
-          </p>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">Management</p>
+          <h2 className="text-2xl font-semibold tracking-tight">Tables</h2>
         </div>
         <div className="flex gap-2">
           <BulkCreateTableDialog
@@ -155,10 +139,8 @@ export function TablesSection({ event, tenantSubdomain }: TablesSectionProps) {
               isOpen={openGroups.has(groupName)}
               onToggle={() => toggleGroup(groupName)}
               isDeleting={isDeleting}
-              isRegenerating={isRegenerating}
               isPending={isPending}
               onEdit={setEditingTable}
-              onRegenerateSeats={handleRegenerateSeats}
               onToggleStatus={handleToggleStatus}
               onDelete={setDeleteTarget}
             />
@@ -170,7 +152,7 @@ export function TablesSection({ event, tenantSubdomain }: TablesSectionProps) {
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         title="Delete table"
-        description="Are you sure you want to delete this table? This will also delete all seats."
+        description="Are you sure you want to delete this table? This action cannot be undone."
         confirmLabel="Delete"
         variant="destructive"
         loading={!!isDeleting}

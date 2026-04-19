@@ -39,9 +39,11 @@ const ORDER_WITH_RELATIONS_INCLUDE = {
   items: {
     include: {
       ticketType: true,
+      table: true,
       tickets: {
         include: {
           ticketType: true,
+          table: true,
         },
       },
     },
@@ -49,6 +51,7 @@ const ORDER_WITH_RELATIONS_INCLUDE = {
   tickets: {
     include: {
       ticketType: true,
+      table: true,
     },
   },
   promotion: true,
@@ -133,6 +136,7 @@ export async function initializeCheckoutAction(
                 priceTiers: true,
               },
             },
+            table: true,
             priceTier: true,
           },
         },
@@ -163,27 +167,36 @@ export async function initializeCheckoutAction(
 
     // Validate availability for each item
     for (const item of cart.items) {
-      const ticketType = item.ticketType;
-
-      // Check overall quantity
-      if (ticketType.quantityTotal !== null) {
-        const available = ticketType.quantityTotal - ticketType.quantitySold;
-        if (available < item.quantity) {
+      if (item.tableId && item.table) {
+        // Table purchase — each table can only be sold once
+        if (item.table.quantitySold >= 1) {
           return {
-            error: `"${ticketType.name}" only has ${available} tickets remaining`,
+            error: `Table "${item.table.label}" is no longer available`,
           };
         }
-      }
+      } else if (item.ticketTypeId && item.ticketType) {
+        const ticketType = item.ticketType;
 
-      // Check price tier allocation if applicable
-      if (item.priceTierId) {
-        const priceTier = ticketType.priceTiers.find(t => t.id === item.priceTierId);
-        if (priceTier && priceTier.strategy === 'ALLOCATION' && priceTier.allocationTotal !== null) {
-          const available = priceTier.allocationTotal - priceTier.allocationSold;
+        // Check overall quantity
+        if (ticketType.quantityTotal !== null) {
+          const available = ticketType.quantityTotal - ticketType.quantitySold;
           if (available < item.quantity) {
             return {
-              error: `"${ticketType.name}" at ${priceTier.name} price only has ${available} tickets remaining`,
+              error: `"${ticketType.name}" only has ${available} tickets remaining`,
             };
+          }
+        }
+
+        // Check price tier allocation if applicable
+        if (item.priceTierId) {
+          const priceTier = ticketType.priceTiers.find(t => t.id === item.priceTierId);
+          if (priceTier && priceTier.strategy === 'ALLOCATION' && priceTier.allocationTotal !== null) {
+            const available = priceTier.allocationTotal - priceTier.allocationSold;
+            if (available < item.quantity) {
+              return {
+                error: `"${ticketType.name}" at ${priceTier.name} price only has ${available} tickets remaining`,
+              };
+            }
           }
         }
       }
@@ -224,30 +237,38 @@ export async function initializeCheckoutAction(
           data: {
             orderId: newOrder.id,
             ticketTypeId: item.ticketTypeId,
+            tableId: item.tableId,
             priceTierId: item.priceTierId,
-            seatId: item.seatId,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             totalPrice: item.unitPrice * item.quantity,
           },
         });
 
-        // Increment quantitySold (soft reserve)
-        await tx.ticketType.update({
-          where: { id: item.ticketTypeId },
-          data: {
-            quantitySold: { increment: item.quantity },
-          },
-        });
-
-        // Increment allocationSold if applicable
-        if (item.priceTierId) {
-          await tx.ticketTypePriceTier.update({
-            where: { id: item.priceTierId },
+        if (item.tableId) {
+          // Table purchase — mark table as sold
+          await tx.table.update({
+            where: { id: item.tableId },
+            data: { quantitySold: { increment: 1 } },
+          });
+        } else if (item.ticketTypeId) {
+          // Ticket type purchase — increment quantitySold (soft reserve)
+          await tx.ticketType.update({
+            where: { id: item.ticketTypeId },
             data: {
-              allocationSold: { increment: item.quantity },
+              quantitySold: { increment: item.quantity },
             },
           });
+
+          // Increment allocationSold if applicable
+          if (item.priceTierId) {
+            await tx.ticketTypePriceTier.update({
+              where: { id: item.priceTierId },
+              data: {
+                allocationSold: { increment: item.quantity },
+              },
+            });
+          }
         }
       }
 
@@ -387,10 +408,10 @@ export async function applyVoucherCodeAction(
       }
     }
 
-    // Check if promotion applies to ticket types in order
+    // Check if promotion applies to ticket types in order (promotions only apply to ticket types, not tables)
     if (promotion.ticketTypes.length > 0) {
       const applicableTicketTypeIds = new Set(promotion.ticketTypes.map(t => t.ticketTypeId));
-      const orderTicketTypeIds = order.items.map(item => item.ticketTypeId);
+      const orderTicketTypeIds = order.items.map(item => item.ticketTypeId).filter(Boolean) as string[];
       const hasApplicable = orderTicketTypeIds.some(id => applicableTicketTypeIds.has(id));
       if (!hasApplicable) {
         return { error: 'This code does not apply to items in your order' };
@@ -507,7 +528,17 @@ export async function saveAttendeesAction(
     }
 
     // Validate attendee count matches total tickets
-    const totalTickets = order.items.reduce((sum, item) => sum + item.quantity, 0);
+    // Table items generate capacity tickets each; ticket type items generate quantity tickets
+    const itemsWithTables = await prisma.orderItem.findMany({
+      where: { orderId },
+      include: { table: true },
+    });
+    const totalTickets = itemsWithTables.reduce((sum, item) => {
+      if (item.tableId && item.table) {
+        return sum + item.table.capacity;
+      }
+      return sum + item.quantity;
+    }, 0);
     if (attendees.length !== totalTickets) {
       return { error: `Expected ${totalTickets} attendees, got ${attendees.length}` };
     }
@@ -556,6 +587,7 @@ export async function completeCheckoutAction(
         items: {
           include: {
             ticketType: true,
+            table: true,
           },
         },
         voucherCode: true,
@@ -667,7 +699,7 @@ export async function confirmFreeOrderAction(
       where: { id: orderId },
       include: {
         items: {
-          include: { ticketType: true },
+          include: { ticketType: true, table: true },
         },
         voucherCode: true,
       },
@@ -759,6 +791,7 @@ export async function createPaymentSessionAction(
         items: {
           include: {
             ticketType: true,
+            table: true,
           },
         },
         voucherCode: true,
@@ -799,13 +832,21 @@ export async function createPaymentSessionAction(
 
     // Create PayMongo checkout session
     // PayMongo expects amounts in centavos (100 centavos = 1 PHP)
-    const lineItems = order.items.map((item) => ({
-      amount: item.unitPrice * item.quantity * 100,
-      currency: 'PHP',
-      name: `${item.ticketType.name} x${item.quantity}`,
-      quantity: 1,
-      description: `${order.event.name} - ${item.ticketType.name}`,
-    }));
+    const lineItems = order.items.map((item) => {
+      const itemName = item.table
+        ? `Table ${item.table.label} (${item.table.capacity} seats)`
+        : `${item.ticketType!.name} x${item.quantity}`;
+      const itemDesc = item.table
+        ? `${order.event.name} - Table ${item.table.label}`
+        : `${order.event.name} - ${item.ticketType!.name}`;
+      return {
+        amount: item.unitPrice * item.quantity * 100,
+        currency: 'PHP',
+        name: itemName,
+        quantity: 1,
+        description: itemDesc,
+      };
+    });
 
     // If there's a discount, add it as a negative line item description
     // PayMongo doesn't support negative amounts, so we adjust the total
@@ -968,22 +1009,30 @@ export async function cancelOrderAction(
     await prisma.$transaction(async (tx) => {
       // Release inventory
       for (const item of order.items) {
-        // Decrement quantitySold
-        await tx.ticketType.update({
-          where: { id: item.ticketTypeId },
-          data: {
-            quantitySold: { decrement: item.quantity },
-          },
-        });
-
-        // Decrement allocationSold if applicable
-        if (item.priceTierId) {
-          await tx.ticketTypePriceTier.update({
-            where: { id: item.priceTierId },
+        if (item.tableId) {
+          // Table purchase — release table
+          await tx.table.update({
+            where: { id: item.tableId },
+            data: { quantitySold: { decrement: 1 } },
+          });
+        } else if (item.ticketTypeId) {
+          // Decrement quantitySold
+          await tx.ticketType.update({
+            where: { id: item.ticketTypeId },
             data: {
-              allocationSold: { decrement: item.quantity },
+              quantitySold: { decrement: item.quantity },
             },
           });
+
+          // Decrement allocationSold if applicable
+          if (item.priceTierId) {
+            await tx.ticketTypePriceTier.update({
+              where: { id: item.priceTierId },
+              data: {
+                allocationSold: { decrement: item.quantity },
+              },
+            });
+          }
         }
       }
 

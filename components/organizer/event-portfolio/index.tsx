@@ -59,6 +59,7 @@ export function EventPortfolioForm({ initialData, onSave, onSaveAndExit }: Event
   const [isLoading, setIsLoading] = useState(false);
   const [portfolioData, setPortfolioData] = useState<EventPortfolioData>(initialData || {});
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateData = (section: keyof EventPortfolioData, data: any) => {
     const newData = { ...portfolioData, [section]: data };
     setPortfolioData(newData);

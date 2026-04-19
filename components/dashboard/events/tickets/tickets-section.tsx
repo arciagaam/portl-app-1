@@ -4,19 +4,18 @@ import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  createTicketTypeForTenantAction,
+  createTicketTypeWithPromotionForTenantAction,
   updateTicketTypeForTenantAction,
   deleteTicketTypeForTenantAction,
   updateTicketTypeStatusForTenantAction,
 } from '@/app/actions/tenant-events';
-import type { TicketTypeFormData } from '@/lib/validations/events';
+import type { TicketTypeFormData, TicketTypeWithPromotionFormData } from '@/lib/validations/events';
 import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import type { TicketsSectionProps } from './types';
-import { kindOrder } from './constants';
 import { CreateTicketTypeDialog } from './create-ticket-type-dialog';
 import { EditTicketTypeDialog } from './edit-ticket-type-dialog';
 import { PriceTiersDialog } from './price-tiers-dialog';
-import { TicketTypeGroup } from './ticket-type-group';
+import { TicketTypeList } from './ticket-type-list';
 import { EmptyTicketsState } from './empty-tickets-state';
 
 export function TicketsSection({ event, tenantSubdomain }: TicketsSectionProps) {
@@ -26,25 +25,15 @@ export function TicketsSection({ event, tenantSubdomain }: TicketsSectionProps) 
   const [priceTiersDialogOpen, setPriceTiersDialogOpen] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set(['GENERAL', 'TABLE', 'SEAT']));
   const [isPending, startTransition] = useTransition();
 
-  const toggleGroup = (kind: string) => {
-    setOpenGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(kind)) next.delete(kind);
-      else next.add(kind);
-      return next;
-    });
-  };
-
-  const handleCreateTicketType = async (data: TicketTypeFormData) => {
+  const handleCreateTicketType = async (data: TicketTypeWithPromotionFormData) => {
     try {
-      const result = await createTicketTypeForTenantAction(tenantSubdomain, event.id, data);
+      const result = await createTicketTypeWithPromotionForTenantAction(tenantSubdomain, event.id, data);
       if ('error' in result) {
         toast.error(result.error);
       } else {
-        toast.success('Ticket type created successfully');
+        toast.success(data.promotion ? 'Ticket type and promotion created' : 'Ticket type created successfully');
         setCreateDialogOpen(false);
         router.refresh();
       }
@@ -97,14 +86,6 @@ export function TicketsSection({ event, tenantSubdomain }: TicketsSectionProps) 
     });
   };
 
-  // Group ticket types by kind
-  const grouped = new Map<string, typeof event.ticketTypes>();
-  for (const tt of event.ticketTypes) {
-    const list = grouped.get(tt.kind) ?? [];
-    list.push(tt);
-    grouped.set(tt.kind, list);
-  }
-
   const editingTicketTypeData = editingTicketType
     ? event.ticketTypes.find((tt) => tt.id === editingTicketType)
     : null;
@@ -117,15 +98,12 @@ export function TicketsSection({ event, tenantSubdomain }: TicketsSectionProps) 
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">Ticket Types</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage ticket types and pricing for this event
-          </p>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">Management</p>
+          <h2 className="text-2xl font-semibold tracking-tight">Ticket Types</h2>
         </div>
         <CreateTicketTypeDialog
           open={createDialogOpen}
           onOpenChange={setCreateDialogOpen}
-          tables={event.tables}
           onSubmit={handleCreateTicketType}
         />
       </div>
@@ -133,34 +111,20 @@ export function TicketsSection({ event, tenantSubdomain }: TicketsSectionProps) 
       {event.ticketTypes.length === 0 ? (
         <EmptyTicketsState onCreateClick={() => setCreateDialogOpen(true)} />
       ) : (
-        <div className="space-y-4">
-          {kindOrder.map((kind) => {
-            const items = grouped.get(kind);
-            if (!items || items.length === 0) return null;
-
-            return (
-              <TicketTypeGroup
-                key={kind}
-                kind={kind}
-                items={items}
-                isOpen={openGroups.has(kind)}
-                onToggle={() => toggleGroup(kind)}
-                onEdit={setEditingTicketType}
-                onOpenPriceTiers={setPriceTiersDialogOpen}
-                onToggleStatus={handleToggleStatus}
-                onDelete={setDeleteTarget}
-                isPending={isPending}
-                isDeleting={isDeleting}
-              />
-            );
-          })}
-        </div>
+        <TicketTypeList
+          items={event.ticketTypes}
+          onEdit={setEditingTicketType}
+          onOpenPriceTiers={setPriceTiersDialogOpen}
+          onToggleStatus={handleToggleStatus}
+          onDelete={setDeleteTarget}
+          isPending={isPending}
+          isDeleting={isDeleting}
+        />
       )}
 
       {editingTicketTypeData && (
         <EditTicketTypeDialog
           ticketType={editingTicketTypeData}
-          tables={event.tables}
           onClose={() => setEditingTicketType(null)}
           onSubmit={handleUpdateTicketType}
         />

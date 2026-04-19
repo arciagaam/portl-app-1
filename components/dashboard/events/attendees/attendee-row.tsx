@@ -52,7 +52,7 @@ export function AttendeeRow({
       </td>
       <td className="py-3 px-2">
         <Badge variant="outline" className="text-xs">
-          {attendee.ticketType.name}
+          {attendee.ticketType?.name ?? 'Unknown'}
         </Badge>
       </td>
       <td className="py-3 px-2">

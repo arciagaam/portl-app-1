@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,12 +31,12 @@ export function ArtistsForm({ initialData, onChange }: ArtistsFormProps) {
       <CardHeader>
         <CardTitle>Artists & Talent</CardTitle>
         <CardDescription>
-          List notable artists you've worked with and any recurring talent relationships
+          List notable artists you&apos;ve worked with and any recurring talent relationships
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="notable-artists">Notable Artists You've Worked With</Label>
+          <Label htmlFor="notable-artists">Notable Artists You&apos;ve Worked With</Label>
           <Textarea
             id="notable-artists"
             placeholder="List notable artists, performers, or talent you've collaborated with..."

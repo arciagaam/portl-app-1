@@ -24,7 +24,7 @@ import {
 } from '@/app/actions/tenant-events';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import type { PromotionFormData } from '@/lib/validations/events';
+import type { InlinePromotionFormData } from '@/lib/validations/events';
 
 type EventWithPromotions = Event & Prisma.EventGetPayload<{
   include: {
@@ -60,7 +60,7 @@ export function PromotionsSection({ event, tenantSubdomain }: PromotionsSectionP
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const handleCreatePromotion = async (data: PromotionFormData) => {
+  const handleCreatePromotion = async (data: InlinePromotionFormData) => {
     const result = await createPromotionForTenantAction(tenantSubdomain, event.id, data);
     if ('error' in result) {
       toast.error(result.error);
@@ -111,10 +111,8 @@ export function PromotionsSection({ event, tenantSubdomain }: PromotionsSectionP
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">Promotions</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage promotions and voucher codes for this event
-          </p>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">Management</p>
+          <h2 className="text-2xl font-semibold tracking-tight">Promotions</h2>
         </div>
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogTrigger asChild>

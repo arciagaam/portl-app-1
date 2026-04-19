@@ -81,6 +81,14 @@ export async function getPublicEventById(subdomain: string, eventId: string) {
             createdAt: 'asc',
           },
         },
+        tables: {
+          where: {
+            status: { not: 'HIDDEN' },
+          },
+          orderBy: {
+            label: 'asc',
+          },
+        },
       },
     });
 

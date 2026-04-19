@@ -21,18 +21,21 @@ type UserMenuProps = {
   mainDomainPrefix?: string
 }
 
+function AnchorLink({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) {
+  return <a href={href} className={className}>{children}</a>
+}
+
+function NextLink({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) {
+  return <Link href={href} className={className}>{children}</Link>
+}
+
 export function UserMenu({ userName, userEmail, hasTenants, mainDomainPrefix = '' }: UserMenuProps) {
   const displayName = userName || userEmail || 'Account'
   const p = mainDomainPrefix // shorthand
 
   // On tenant subdomains, use <a> for cross-domain navigation; on main domain, use <Link>
-  const MenuLink = p
-    ? ({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) => (
-        <a href={`${p}${href}`} className={className}>{children}</a>
-      )
-    : ({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) => (
-        <Link href={href} className={className}>{children}</Link>
-      )
+  const MenuLink = p ? AnchorLink : NextLink
+  const link = (path: string) => `${p}${path}`
 
   return (
     <DropdownMenu>
@@ -56,19 +59,19 @@ export function UserMenu({ userName, userEmail, hasTenants, mainDomainPrefix = '
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <MenuLink href="/account" className="cursor-pointer">
+          <MenuLink href={link('/account')} className="cursor-pointer">
             <User className="mr-2 h-4 w-4" />
             My Account
           </MenuLink>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <MenuLink href="/account/tickets" className="cursor-pointer">
+          <MenuLink href={link('/account/tickets')} className="cursor-pointer">
             <Ticket className="mr-2 h-4 w-4" />
             My Tickets
           </MenuLink>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <MenuLink href="/account/settings" className="cursor-pointer">
+          <MenuLink href={link('/account/settings')} className="cursor-pointer">
             <Settings className="mr-2 h-4 w-4" />
             Settings
           </MenuLink>
@@ -76,14 +79,14 @@ export function UserMenu({ userName, userEmail, hasTenants, mainDomainPrefix = '
         <DropdownMenuSeparator />
         {hasTenants ? (
           <DropdownMenuItem asChild>
-            <MenuLink href="/dashboard" className="cursor-pointer">
+            <MenuLink href={link('/dashboard')} className="cursor-pointer">
               <LayoutDashboard className="mr-2 h-4 w-4" />
               Organizer Dashboard
             </MenuLink>
           </DropdownMenuItem>
         ) : (
           <DropdownMenuItem asChild>
-            <MenuLink href="/organizer/register" className="cursor-pointer">
+            <MenuLink href={link('/organizer/register')} className="cursor-pointer">
               <Plus className="mr-2 h-4 w-4" />
               Become an Organizer
             </MenuLink>

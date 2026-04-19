@@ -140,6 +140,7 @@ export const columns: ColumnDef<Application>[] = [
     id: 'actions',
     cell: ({ row, table }) => {
       const application = row.original;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const meta = table.options.meta as any;
 
       return (

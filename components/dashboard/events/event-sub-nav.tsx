@@ -76,7 +76,7 @@ export function EventSubNav({ eventId, tenantSubdomain, tableCounts }: EventSubN
   ];
 
   return (
-    <nav className="flex gap-1 border-b">
+    <nav className="flex gap-0 border-b overflow-x-auto">
       {navItems.map((item) => {
         const Icon = item.icon;
         return (
@@ -84,13 +84,13 @@ export function EventSubNav({ eventId, tenantSubdomain, tableCounts }: EventSubN
             key={item.href}
             href={item.href}
             className={cn(
-              'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
+              'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
               item.isActive
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/50'
+                ? 'border-foreground text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className="h-3.5 w-3.5" />
             {item.label}
           </Link>
         );

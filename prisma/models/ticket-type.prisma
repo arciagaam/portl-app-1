@@ -3,7 +3,6 @@ model TicketType {
   eventId       String
   name          String
   description   String?         @db.Text
-  kind          TicketKind
   basePrice     Int             // Base price in PHP
   quantityTotal Int?            // Optional total inventory
   quantitySold  Int             @default(0)
@@ -11,16 +10,12 @@ model TicketType {
   cancellable     Boolean       @default(false)
   status        InventoryStatus @default(OPEN)
 
-  // For TABLE and SEAT kinds, link to specific table
-  tableId       String?
-
   imageUrl      String?
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
   event      Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  table      Table?               @relation(fields: [tableId], references: [id], onDelete: SetNull)
   priceTiers TicketTypePriceTier[]
   promotions PromotionTicketType[]
   cartItems  CartItem[]
@@ -28,16 +23,8 @@ model TicketType {
   tickets    Ticket[]
 
   @@index([eventId])
-  @@index([kind])
-  @@index([tableId])
   @@index([status])
   @@map("ticket_types")
-}
-
-enum TicketKind {
-  GENERAL // Normal ticket
-  TABLE   // Whole-table product
-  SEAT    // Seat product
 }
 
 enum InventoryStatus {

@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { ArrowLeft, Calendar, MapPin, Clock, Ticket, User } from 'lucide-react'
+import { ArrowLeft, Calendar, MapPin, Clock, Ticket } from 'lucide-react'
 import { TicketQRCode } from '@/components/ui/ticket-qr-code'
+import { EditAttendeeForm } from '@/components/account/edit-attendee-form'
 import { tenantUrl } from '@/lib/url'
 import { getTicketByIdAction } from '@/app/actions/orders'
 
@@ -90,8 +91,19 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
                 {/* Ticket Details */}
                 <CardContent className="p-6 space-y-6">
                     {/* QR Code */}
-                    <div className="flex justify-center">
-                        <TicketQRCode value={ticket.ticketCode} />
+                    <div className="flex flex-col items-center gap-2">
+                        <TicketQRCode value={ticket.ticketCode} status={ticket.status} />
+                        {ticket.status === 'CHECKED_IN' && ticket.checkedInAt && (
+                            <p className="text-sm text-muted-foreground">
+                                Checked in on {new Date(ticket.checkedInAt).toLocaleString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                })}
+                            </p>
+                        )}
                     </div>
 
                     {/* Ticket Code */}
@@ -106,8 +118,12 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
 
                     {/* Ticket Type */}
                     <div>
-                        <h3 className="font-semibold mb-2">{ticket.ticketType.name}</h3>
-                        {ticket.ticketType.description && (
+                        <h3 className="font-semibold mb-2">
+                            {ticket.table
+                                ? `Table ${ticket.table.label}`
+                                : ticket.ticketType?.name ?? 'Unknown'}
+                        </h3>
+                        {ticket.ticketType?.description && (
                             <p className="text-sm text-muted-foreground">
                                 {ticket.ticketType.description}
                             </p>
@@ -144,27 +160,20 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
                     <Separator />
 
                     {/* Attendee Info */}
-                    <div>
-                        <div className="flex items-center gap-2 mb-3">
-                            <User className="h-5 w-5 text-muted-foreground" />
-                            <h3 className="font-semibold">Attendee</h3>
-                        </div>
-                        {ticket.holderFirstName ? (
-                            <div className="space-y-1">
-                                <p className="font-medium">
-                                    {ticket.holderFirstName} {ticket.holderLastName}
-                                </p>
-                                {ticket.holderEmail && (
-                                    <p className="text-sm text-muted-foreground">{ticket.holderEmail}</p>
-                                )}
-                                {ticket.holderPhone && (
-                                    <p className="text-sm text-muted-foreground">{ticket.holderPhone}</p>
-                                )}
-                            </div>
-                        ) : (
-                            <p className="text-muted-foreground">No attendee assigned yet</p>
-                        )}
-                    </div>
+                    <EditAttendeeForm
+                        ticketId={ticket.id}
+                        currentAttendee={{
+                            firstName: ticket.holderFirstName,
+                            lastName: ticket.holderLastName,
+                            email: ticket.holderEmail,
+                            phone: ticket.holderPhone,
+                        }}
+                        canEdit={
+                            ticket.ownerId === user.id
+                            && ticket.status === 'ACTIVE'
+                            && new Date(`${new Date(ticket.event.startDate).toISOString().split('T')[0]}T${ticket.event.startTime}`) > new Date()
+                        }
+                    />
 
                     {/* Actions */}
                     <div className="flex flex-col gap-3 pt-4">
@@ -189,10 +198,10 @@ export default async function TicketDetailPage({ params }: TicketDetailPageProps
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm text-muted-foreground">
                     <p>
-                        Present this ticket code at the venue entrance for admission.
+                        Present this QR code at the venue entrance for admission. Each QR code can only be scanned once.
                     </p>
                     <p>
-                        This ticket is non-transferable unless the event organizer allows transfers.
+                        You can update attendee details until the event starts.
                     </p>
                     <p>
                         Keep your ticket code confidential to prevent unauthorized use.

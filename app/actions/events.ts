@@ -3,7 +3,7 @@
 import { requireAdmin } from '@/lib/admin';
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
-import type { EventFormData, TableFormData, BulkTableFormData, TicketTypeFormData, PriceTierFormData, PromotionFormData, VoucherCodeFormData } from '@/lib/validations/events';
+import type { EventFormData, TableFormData, BulkTableFormData, TicketTypeFormData, TicketTypeWithPromotionFormData, TableWithPromotionFormData, PriceTierFormData, PromotionFormData, VoucherCodeFormData } from '@/lib/validations/events';
 import * as helpers from '@/lib/event-helpers';
 
 // ============================================================================
@@ -56,21 +56,12 @@ export async function getEventByIdAction(eventId: string) {
       where: { id: eventId },
       include: {
         tables: {
-          include: {
-            seats: true,
-            _count: {
-              select: {
-                ticketTypes: true,
-              },
-            },
-          },
           orderBy: {
             label: 'asc',
           },
         },
         ticketTypes: {
           include: {
-            table: true,
             priceTiers: {
               orderBy: {
                 priority: 'desc',
@@ -291,6 +282,24 @@ export async function createTableAction(eventId: string, data: TableFormData) {
   }
 }
 
+export async function createTableWithPromotionAction(eventId: string, data: TableWithPromotionFormData) {
+  try {
+    await requireAdmin();
+    const result = await helpers.createTableWithPromotion(eventId, data);
+    revalidatePath(`/admin/events/${eventId}`);
+    return { data: result };
+  } catch (error) {
+    console.error('Error creating table:', error);
+    if (error instanceof Error && error.message.includes('Unauthorized')) {
+      return { error: error.message };
+    }
+    if (error instanceof Error && error.message.includes('Unique constraint')) {
+      return { error: 'A table with this label already exists for this event' };
+    }
+    return { error: 'Failed to create table' };
+  }
+}
+
 export async function bulkCreateTablesAction(eventId: string, data: BulkTableFormData) {
   try {
     await requireAdmin();
@@ -303,38 +312,6 @@ export async function bulkCreateTablesAction(eventId: string, data: BulkTableFor
       return { error: error.message };
     }
     return { error: 'Failed to bulk create tables' };
-  }
-}
-
-export async function updateTableCapacityAction(tableId: string, newCapacity: number) {
-  try {
-    await requireAdmin();
-    const result = await helpers.updateTableCapacity(tableId, newCapacity);
-    const table = await prisma.table.findUnique({ where: { id: tableId }, include: { event: true } });
-    if (table) revalidatePath(`/admin/events/${table.eventId}`);
-    return { data: result };
-  } catch (error) {
-    console.error('Error updating table capacity:', error);
-    if (error instanceof Error && error.message.includes('Unauthorized')) {
-      return { error: error.message };
-    }
-    return { error: error instanceof Error ? error.message : 'Failed to update table capacity' };
-  }
-}
-
-export async function regenerateSeatsAction(tableId: string) {
-  try {
-    await requireAdmin();
-    const result = await helpers.regenerateSeats(tableId);
-    const table = await prisma.table.findUnique({ where: { id: tableId }, include: { event: true } });
-    if (table) revalidatePath(`/admin/events/${table.eventId}`);
-    return { data: result };
-  } catch (error) {
-    console.error('Error regenerating seats:', error);
-    if (error instanceof Error && error.message.includes('Unauthorized')) {
-      return { error: error.message };
-    }
-    return { error: error instanceof Error ? error.message : 'Failed to regenerate seats' };
   }
 }
 
@@ -379,7 +356,6 @@ export async function getTicketTypesByEventAction(eventId: string) {
     const ticketTypes = await prisma.ticketType.findMany({
       where: { eventId },
       include: {
-        table: true,
         priceTiers: { orderBy: { priority: 'desc' } },
       },
       orderBy: { createdAt: 'desc' },
@@ -400,6 +376,21 @@ export async function createTicketTypeAction(eventId: string, data: TicketTypeFo
     const ticketType = await helpers.createTicketType(eventId, data);
     revalidatePath(`/admin/events/${eventId}`);
     return { data: ticketType };
+  } catch (error) {
+    console.error('Error creating ticket type:', error);
+    if (error instanceof Error && error.message.includes('Unauthorized')) {
+      return { error: error.message };
+    }
+    return { error: error instanceof Error ? error.message : 'Failed to create ticket type' };
+  }
+}
+
+export async function createTicketTypeWithPromotionAction(eventId: string, data: TicketTypeWithPromotionFormData) {
+  try {
+    await requireAdmin();
+    const result = await helpers.createTicketTypeWithPromotion(eventId, data);
+    revalidatePath(`/admin/events/${eventId}`);
+    return { data: result };
   } catch (error) {
     console.error('Error creating ticket type:', error);
     if (error instanceof Error && error.message.includes('Unauthorized')) {

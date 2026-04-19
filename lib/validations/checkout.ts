@@ -3,9 +3,16 @@ import * as z from 'zod';
 // Add to cart validation
 export const addToCartSchema = z.object({
   eventId: z.string().cuid('Invalid event ID'),
-  ticketTypeId: z.string().cuid('Invalid ticket type ID'),
+  ticketTypeId: z.string().cuid('Invalid ticket type ID').optional().nullable(),
+  tableId: z.string().cuid('Invalid table ID').optional().nullable(),
   quantity: z.number().int().positive('Quantity must be at least 1').max(10, 'Maximum 10 tickets per type'),
-  seatId: z.string().cuid().optional().nullable(),
+}).refine((data) => {
+  // Exactly one of ticketTypeId or tableId must be provided
+  const hasTicketType = !!data.ticketTypeId;
+  const hasTable = !!data.tableId;
+  return hasTicketType !== hasTable;
+}, {
+  message: 'Exactly one of ticketTypeId or tableId must be provided',
 });
 
 export type AddToCartData = z.infer<typeof addToCartSchema>;

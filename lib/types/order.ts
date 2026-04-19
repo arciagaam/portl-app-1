@@ -1,20 +1,23 @@
-import type { Order, OrderItem, Ticket, Event, TicketType, Tenant, Promotion, VoucherCode } from '@/prisma/generated/prisma/client';
+import type { Order, OrderItem, Ticket, Event, TicketType, Table, Tenant, Promotion, VoucherCode } from '@/prisma/generated/prisma/client';
 
 // Shared across checkout and order modules
 export type OrderItemWithRelations = OrderItem & {
-  ticketType: TicketType;
-  tickets: Ticket[];
+  ticketType: TicketType | null;
+  table: Table | null;
+  tickets: (Ticket & { ticketType: TicketType | null; table: Table | null })[];
 };
 
-// Checkout-specific: ticket with just its type
+// Checkout-specific: ticket with just its type/table
 export type TicketWithTicketType = Ticket & {
-  ticketType: TicketType;
+  ticketType: TicketType | null;
+  table: Table | null;
 };
 
 // Account-specific: ticket with full relations for display
 export type TicketWithRelations = Ticket & {
   event: Event & { tenant: Tenant };
-  ticketType: TicketType;
+  ticketType: TicketType | null;
+  table: Table | null;
   order: Order;
 };
 

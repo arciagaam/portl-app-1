@@ -68,7 +68,7 @@ export function ComplianceForm({ initialData, onSubmit }: ComplianceFormProps) {
                   Platform Terms & Conditions
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  I agree to abide by the platform's terms of service and organizer guidelines. 
+                  I agree to abide by the platform&apos;s terms of service and organizer guidelines.
                   <button className="text-primary hover:underline ml-1">
                     View terms
                   </button>

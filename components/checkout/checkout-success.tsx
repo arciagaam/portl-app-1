@@ -69,7 +69,11 @@ export function CheckoutSuccess({ order, tenantSubdomain }: CheckoutSuccessProps
               >
                 <TicketQRCode value={ticket.ticketCode} size={64} />
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium">{ticket.ticketType.name}</p>
+                  <p className="font-medium">
+                    {ticket.table
+                      ? `Table ${ticket.table.label} (${ticket.table.capacity} seats)`
+                      : ticket.ticketType?.name ?? 'Unknown item'}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {ticket.holderFirstName
                       ? `${ticket.holderFirstName} ${ticket.holderLastName}`

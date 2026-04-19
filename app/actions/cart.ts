@@ -4,7 +4,7 @@ import { requireAuth, getCurrentUser } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { handleActionError } from '@/lib/action-utils';
 import type { AddToCartData, UpdateCartItemData } from '@/lib/validations/checkout';
-import type { Cart, CartItem, Event, TicketType, TicketTypePriceTier, Tenant } from '@/prisma/generated/prisma/client';
+import type { Cart, CartItem, Event, TicketType, TicketTypePriceTier, Tenant, Table } from '@/prisma/generated/prisma/client';
 
 // Cart expiration time in minutes
 const CART_EXPIRATION_MINUTES = 15;
@@ -12,7 +12,8 @@ const CART_EXPIRATION_MINUTES = 15;
 // Types for cart with relations
 export type CartItemWithRelations = CartItem & {
   event: Event & { tenant: Tenant };
-  ticketType: TicketType;
+  ticketType: TicketType | null;
+  table: Table | null;
   priceTier: TicketTypePriceTier | null;
 };
 
@@ -107,6 +108,7 @@ export async function getOrCreateCartAction(): Promise<{ data: CartWithItems } |
               },
             },
             ticketType: true,
+            table: true,
             priceTier: true,
           },
           orderBy: {
@@ -140,6 +142,7 @@ export async function getOrCreateCartAction(): Promise<{ data: CartWithItems } |
                 },
               },
               ticketType: true,
+              table: true,
               priceTier: true,
             },
             orderBy: {
@@ -162,6 +165,7 @@ export async function getOrCreateCartAction(): Promise<{ data: CartWithItems } |
                 },
               },
               ticketType: true,
+              table: true,
               priceTier: true,
             },
             orderBy: {
@@ -180,6 +184,7 @@ export async function getOrCreateCartAction(): Promise<{ data: CartWithItems } |
 
 /**
  * Add item to cart with price locking
+ * Accepts either a ticketTypeId (ticket purchase) or tableId (table purchase), not both.
  */
 export async function addToCartAction(
   data: AddToCartData
@@ -188,64 +193,50 @@ export async function addToCartAction(
     const session = await requireAuth();
     const userId = session.user.id;
 
-    const { eventId, ticketTypeId, quantity, seatId } = data;
+    const { eventId, ticketTypeId, tableId, quantity } = data;
 
-    // Validate ticket type exists and get current price
-    const ticketType = await prisma.ticketType.findUnique({
-      where: { id: ticketTypeId },
-      include: {
-        event: {
-          include: {
-            tenant: true,
+    let price: number;
+    let priceTierId: string | null = null;
+    let effectiveQuantity = quantity;
+
+    if (tableId) {
+      // ---- TABLE PURCHASE ----
+      const table = await prisma.table.findUnique({
+        where: { id: tableId },
+        include: {
+          event: {
+            include: {
+              tenant: true,
+            },
           },
         },
-        priceTiers: true,
-      },
-    });
+      });
 
-    if (!ticketType) {
-      return { error: 'Ticket type not found' };
-    }
-
-    if (ticketType.eventId !== eventId) {
-      return { error: 'Ticket type does not belong to this event' };
-    }
-
-    if (ticketType.event.status !== 'PUBLISHED') {
-      return { error: 'Event is not available for purchase' };
-    }
-
-    if (ticketType.status === 'HIDDEN' || ticketType.status === 'CLOSED') {
-      return { error: 'This ticket type is not available for purchase' };
-    }
-
-    // Check availability
-    if (ticketType.quantityTotal !== null) {
-      const available = ticketType.quantityTotal - ticketType.quantitySold;
-      if (available < quantity) {
-        return { error: available === 0 ? 'Sold out' : `Only ${available} tickets available` };
+      if (!table) {
+        return { error: 'Table not found' };
       }
-    }
 
-    // Get current price
-    const { price, priceTierId } = getCurrentPrice(ticketType);
-
-    // Check allocation limit if using allocation-based price tier
-    if (priceTierId) {
-      const priceTier = ticketType.priceTiers.find(t => t.id === priceTierId);
-      if (priceTier && priceTier.strategy === 'ALLOCATION' && priceTier.allocationTotal !== null) {
-        const available = priceTier.allocationTotal - priceTier.allocationSold;
-        if (available < quantity) {
-          return { error: `Only ${available} tickets available at this price` };
-        }
+      if (table.eventId !== eventId) {
+        return { error: 'Table does not belong to this event' };
       }
-    }
 
-    // For SEAT tickets, validate seat is not already reserved
-    if (seatId) {
+      if (table.event.status !== 'PUBLISHED') {
+        return { error: 'Event is not available for purchase' };
+      }
+
+      if (table.status !== 'OPEN') {
+        return { error: 'This table is not available for purchase' };
+      }
+
+      // Each table can only be sold once
+      if (table.quantitySold >= 1) {
+        return { error: 'This table is already sold' };
+      }
+
+      // Check if table is already in another active cart
       const existingCartItem = await prisma.cartItem.findFirst({
         where: {
-          seatId,
+          tableId,
           cart: {
             expiresAt: { gt: new Date() },
           },
@@ -253,13 +244,13 @@ export async function addToCartAction(
       });
 
       if (existingCartItem) {
-        return { error: 'This seat is already reserved' };
+        return { error: 'This table is already reserved' };
       }
 
-      // Also check if seat is already in a confirmed order
+      // Check if table is already in a pending/confirmed order
       const existingOrderItem = await prisma.orderItem.findFirst({
         where: {
-          seatId,
+          tableId,
           order: {
             status: { in: ['PENDING', 'CONFIRMED'] },
           },
@@ -267,8 +258,67 @@ export async function addToCartAction(
       });
 
       if (existingOrderItem) {
-        return { error: 'This seat is already sold' };
+        return { error: 'This table is already sold' };
       }
+
+      // Table price = capacity * ticketPrice, quantity is always 1
+      price = table.capacity * table.ticketPrice;
+      effectiveQuantity = 1;
+    } else if (ticketTypeId) {
+      // ---- TICKET TYPE PURCHASE ----
+      const ticketType = await prisma.ticketType.findUnique({
+        where: { id: ticketTypeId },
+        include: {
+          event: {
+            include: {
+              tenant: true,
+            },
+          },
+          priceTiers: true,
+        },
+      });
+
+      if (!ticketType) {
+        return { error: 'Ticket type not found' };
+      }
+
+      if (ticketType.eventId !== eventId) {
+        return { error: 'Ticket type does not belong to this event' };
+      }
+
+      if (ticketType.event.status !== 'PUBLISHED') {
+        return { error: 'Event is not available for purchase' };
+      }
+
+      if (ticketType.status === 'HIDDEN' || ticketType.status === 'CLOSED') {
+        return { error: 'This ticket type is not available for purchase' };
+      }
+
+      // Check availability
+      if (ticketType.quantityTotal !== null) {
+        const available = ticketType.quantityTotal - ticketType.quantitySold;
+        if (available < quantity) {
+          return { error: available === 0 ? 'Sold out' : `Only ${available} tickets available` };
+        }
+      }
+
+      // Get current price
+      const currentPrice = getCurrentPrice(ticketType);
+      price = currentPrice.price;
+      priceTierId = currentPrice.priceTierId;
+
+      // Check allocation limit if using allocation-based price tier
+      if (priceTierId) {
+        const priceTier = ticketType.priceTiers.find(t => t.id === priceTierId);
+        if (priceTier && priceTier.strategy === 'ALLOCATION' && priceTier.allocationTotal !== null) {
+          const available = priceTier.allocationTotal - priceTier.allocationSold;
+          if (available < quantity) {
+            return { error: `Only ${available} tickets available at this price` };
+          }
+        }
+      }
+    } else {
+      return { error: 'Either ticketTypeId or tableId must be provided' };
     }
 
     // Get or create cart
@@ -279,35 +329,52 @@ export async function addToCartAction(
 
     const cart = cartResult.data;
 
-    // Check if item already exists in cart (same ticket type and seat)
-    const existingItem = cart.items.find(
-      item => item.ticketTypeId === ticketTypeId && item.seatId === (seatId || null)
-    );
-
-    if (existingItem) {
-      // Update quantity
-      const newQuantity = existingItem.quantity + quantity;
-      if (newQuantity > 10) {
-        return { error: 'Maximum 10 tickets per type' };
+    if (tableId) {
+      // Tables are always added as new items (no stacking)
+      const existingItem = cart.items.find(item => item.tableId === tableId);
+      if (existingItem) {
+        return { error: 'This table is already in your cart' };
       }
 
-      await prisma.cartItem.update({
-        where: { id: existingItem.id },
-        data: { quantity: newQuantity },
-      });
-    } else {
-      // Create new cart item
       await prisma.cartItem.create({
         data: {
           cartId: cart.id,
           eventId,
-          ticketTypeId,
-          priceTierId,
-          quantity,
+          tableId,
+          quantity: effectiveQuantity,
           unitPrice: price,
-          seatId,
         },
       });
+    } else if (ticketTypeId) {
+      // Check if ticket type already exists in cart
+      const existingItem = cart.items.find(
+        item => item.ticketTypeId === ticketTypeId
+      );
+
+      if (existingItem) {
+        // Update quantity
+        const newQuantity = existingItem.quantity + quantity;
+        if (newQuantity > 10) {
+          return { error: 'Maximum 10 tickets per type' };
+        }
+
+        await prisma.cartItem.update({
+          where: { id: existingItem.id },
+          data: { quantity: newQuantity },
+        });
+      } else {
+        // Create new cart item
+        await prisma.cartItem.create({
+          data: {
+            cartId: cart.id,
+            eventId,
+            ticketTypeId,
+            priceTierId,
+            quantity: effectiveQuantity,
+            unitPrice: price,
+          },
+        });
+      }
     }
 
     // Fetch updated cart
@@ -322,6 +389,7 @@ export async function addToCartAction(
               },
             },
             ticketType: true,
+            table: true,
             priceTier: true,
           },
           orderBy: {
@@ -370,8 +438,13 @@ export async function updateCartItemAction(
       // Remove item
       await prisma.cartItem.delete({ where: { id: cartItemId } });
     } else {
+      // Table items cannot have quantity changed (always 1)
+      if (cartItem.tableId) {
+        return { error: 'Table quantity cannot be changed' };
+      }
+
       // Check availability for new quantity
-      if (cartItem.ticketType.quantityTotal !== null) {
+      if (cartItem.ticketType && cartItem.ticketType.quantityTotal !== null) {
         const available = cartItem.ticketType.quantityTotal - cartItem.ticketType.quantitySold;
         if (available < quantity) {
           return { error: `Only ${available} tickets available` };
@@ -403,6 +476,7 @@ export async function updateCartItemAction(
               },
             },
             ticketType: true,
+            table: true,
             priceTier: true,
           },
           orderBy: {
@@ -463,6 +537,7 @@ export async function removeFromCartAction(
               },
             },
             ticketType: true,
+            table: true,
             priceTier: true,
           },
           orderBy: {
@@ -549,6 +624,7 @@ export async function clearTenantItemsAction(
               },
             },
             ticketType: true,
+            table: true,
             priceTier: true,
           },
           orderBy: {
@@ -594,6 +670,7 @@ export async function getCartSummaryAction(): Promise<{ data: CartSummary } | { 
               },
             },
             ticketType: true,
+            table: true,
             priceTier: true,
           },
           orderBy: {
@@ -701,6 +778,7 @@ export async function getCartForTenantAction(
               },
             },
             ticketType: true,
+            table: true,
             priceTier: true,
           },
           orderBy: {

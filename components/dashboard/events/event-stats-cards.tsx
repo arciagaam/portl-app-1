@@ -1,6 +1,5 @@
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Ticket, Users, DollarSign, TableIcon } from 'lucide-react';
 import { Event, Prisma } from '@/prisma/generated/prisma/client';
 import { formatPhp } from '@/lib/format';
@@ -44,60 +43,52 @@ export function EventStatsCards({ event }: EventStatsCardsProps) {
   }, 0);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Ticket Types</CardTitle>
+    <div className="grid gap-px bg-border md:grid-cols-2 lg:grid-cols-4 border">
+      <div className="bg-background p-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Ticket Types</span>
           <Ticket className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{event.ticketTypes.length}</div>
-          <p className="text-xs text-muted-foreground">
-            {totalTicketCapacity > 0 ? `${totalTicketCapacity} total capacity` : 'No capacity set'}
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+        <p className="text-3xl font-bold tabular-nums">{event.ticketTypes.length}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {totalTicketCapacity > 0 ? `${totalTicketCapacity} total capacity` : 'No capacity set'}
+        </p>
+      </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Tickets Sold</CardTitle>
+      <div className="bg-background p-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Tickets Sold</span>
           <Users className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{totalTicketsSold}</div>
-          <p className="text-xs text-muted-foreground">
-            {totalTicketCapacity > 0
-              ? `${Math.round((totalTicketsSold / totalTicketCapacity) * 100)}% of capacity`
-              : 'No capacity limit'}
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+        <p className="text-3xl font-bold tabular-nums">{totalTicketsSold}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {totalTicketCapacity > 0
+            ? `${Math.round((totalTicketsSold / totalTicketCapacity) * 100)}% of capacity`
+            : 'No capacity limit'}
+        </p>
+      </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Tables</CardTitle>
+      <div className="bg-background p-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Tables</span>
           <TableIcon className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{event.tables.length}</div>
-          <p className="text-xs text-muted-foreground">
-            {event.tables.reduce((acc, t) => acc + t.capacity, 0)} total seats
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+        <p className="text-3xl font-bold tabular-nums">{event.tables.length}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {event.tables.reduce((acc, t) => acc + t.capacity, 0)} total seats
+        </p>
+      </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+      <div className="bg-background p-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Revenue</span>
           <DollarSign className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{formatPhp(currentRevenue)}</div>
-          <p className="text-xs text-muted-foreground">
-            {potentialRevenue > 0 ? `${formatPhp(potentialRevenue)} potential` : 'Set ticket prices'}
-          </p>
-        </CardContent>
-      </Card>
+        </div>
+        <p className="text-3xl font-bold tabular-nums">{formatPhp(currentRevenue)}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {potentialRevenue > 0 ? `${formatPhp(potentialRevenue)} potential` : 'Set ticket prices'}
+        </p>
+      </div>
     </div>
   );
 }

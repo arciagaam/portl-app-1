@@ -1,13 +1,22 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useState } from 'react';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { promotionSchema, type PromotionFormData } from '@/lib/validations/events';
+import { inlinePromotionSchema, type InlinePromotionFormData } from '@/lib/validations/events';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import {
   Select,
   SelectContent,
@@ -15,40 +24,54 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useState } from 'react';
-import { TicketType } from '@/prisma/generated/prisma/client';
+import { Plus, Trash2 } from 'lucide-react';
+import type { TicketType } from '@/prisma/generated/prisma/client';
 
 interface PromotionFormProps {
   eventId: string;
   ticketTypes: TicketType[];
-  defaultValues?: Partial<PromotionFormData>;
-  onSubmit: (data: PromotionFormData) => Promise<void>;
+  defaultValues?: Partial<InlinePromotionFormData>;
+  onSubmit: (data: InlinePromotionFormData) => Promise<void>;
   onCancel: () => void;
 }
 
 export function PromotionForm({ eventId, ticketTypes, defaultValues, onSubmit, onCancel }: PromotionFormProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setValue,
-    watch,
-  } = useForm<PromotionFormData>({
-    resolver: zodResolver(promotionSchema),
+
+  const form = useForm<InlinePromotionFormData>({
+    resolver: zodResolver(inlinePromotionSchema),
     defaultValues: defaultValues || {
+      name: '',
+      description: '',
       requiresCode: true,
       discountType: 'PERCENT',
+      discountValue: 0,
       appliesTo: 'ITEM',
+      validFrom: '',
+      validUntil: '',
       ticketTypeIds: [],
+      codes: [],
     },
   });
 
-  const discountType = watch('discountType');
-  const appliesTo = watch('appliesTo');
-  const selectedTicketTypeIds = watch('ticketTypeIds') || [];
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'codes',
+  });
 
-  const onSubmitForm = async (data: PromotionFormData) => {
+  const requiresCode = form.watch('requiresCode');
+  const selectedTicketTypeIds = form.watch('ticketTypeIds') || [];
+
+  const toggleTicketType = (ticketTypeId: string) => {
+    const current = selectedTicketTypeIds;
+    if (current.includes(ticketTypeId)) {
+      form.setValue('ticketTypeIds', current.filter(id => id !== ticketTypeId));
+    } else {
+      form.setValue('ticketTypeIds', [...current, ticketTypeId]);
+    }
+  };
+
+  const onSubmitForm = async (data: InlinePromotionFormData) => {
     setIsLoading(true);
     try {
       await onSubmit(data);
@@ -57,217 +80,307 @@ export function PromotionForm({ eventId, ticketTypes, defaultValues, onSubmit, o
     }
   };
 
-  const toggleTicketType = (ticketTypeId: string) => {
-    const current = selectedTicketTypeIds;
-    if (current.includes(ticketTypeId)) {
-      setValue('ticketTypeIds', current.filter(id => id !== ticketTypeId));
-    } else {
-      setValue('ticketTypeIds', [...current, ticketTypeId]);
-    }
-  };
-
   return (
-    <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="name">Promotion Name *</Label>
-        <Input
-          id="name"
-          {...register('name')}
-          disabled={isLoading}
-          placeholder="e.g., Summer Sale, Early Bird"
-          className={errors.name ? 'border-red-500' : ''}
-        />
-        {errors.name && (
-          <p className="text-sm text-destructive">{errors.name.message}</p>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
-          {...register('description')}
-          disabled={isLoading}
-          rows={3}
-          className={errors.description ? 'border-red-500' : ''}
-        />
-        {errors.description && (
-          <p className="text-sm text-destructive">{errors.description.message}</p>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="discountType">Discount Type *</Label>
-          <Select
-            value={discountType}
-            onValueChange={(value) => setValue('discountType', value as 'PERCENT' | 'FIXED')}
-            disabled={isLoading}
-          >
-            <SelectTrigger className={errors.discountType ? 'border-red-500' : ''}>
-              <SelectValue placeholder="Select type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="PERCENT">Percent</SelectItem>
-              <SelectItem value="FIXED">Fixed Amount</SelectItem>
-            </SelectContent>
-          </Select>
-          {errors.discountType && (
-            <p className="text-sm text-destructive">{errors.discountType.message}</p>
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmitForm)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Promotion Name *</FormLabel>
+              <FormControl>
+                <Input {...field} disabled={isLoading} placeholder="e.g., Summer Sale, Early Bird" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
           )}
-        </div>
+        />
 
-        <div className="space-y-2">
-          <Label htmlFor="discountValue">
-            Discount Value * 
-            {discountType === 'PERCENT' && ' (basis points, e.g., 1000 = 10%)'}
-            {discountType === 'FIXED' && ' (e.g., 50 = ₱50.00)'}
-          </Label>
-          <Input
-            id="discountValue"
-            type="number"
-            {...register('discountValue', { valueAsNumber: true })}
-            disabled={isLoading}
-            placeholder={discountType === 'PERCENT' ? 'e.g., 1000 for 10%' : 'e.g., 50 for ₱50.00'}
-            className={errors.discountValue ? 'border-red-500' : ''}
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Description</FormLabel>
+              <FormControl>
+                <Textarea {...field} disabled={isLoading} rows={3} />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="discountType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Discount Type *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="PERCENT">Percentage (%)</SelectItem>
+                    <SelectItem value="FIXED">Fixed Amount (PHP)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-          {errors.discountValue && (
-            <p className="text-sm text-destructive">{errors.discountValue.message}</p>
-          )}
-        </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="appliesTo">Applies To *</Label>
-          <Select
-            value={appliesTo}
-            onValueChange={(value) => setValue('appliesTo', value as 'ORDER' | 'ITEM')}
-            disabled={isLoading}
-          >
-            <SelectTrigger className={errors.appliesTo ? 'border-red-500' : ''}>
-              <SelectValue placeholder="Select scope" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ORDER">Order Level</SelectItem>
-              <SelectItem value="ITEM">Item Level</SelectItem>
-            </SelectContent>
-          </Select>
-          {errors.appliesTo && (
-            <p className="text-sm text-destructive">{errors.appliesTo.message}</p>
-          )}
+          <FormField
+            control={form.control}
+            name="discountValue"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  {form.watch('discountType') === 'FIXED' ? 'Amount (PHP) *' : 'Percentage (%) *'}
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    {...field}
+                    onChange={(e) => field.onChange(e.target.value === '' ? 0 : Number(e.target.value))}
+                    disabled={isLoading}
+                    placeholder={form.watch('discountType') === 'PERCENT' ? 'e.g., 10 for 10%' : 'e.g., 50 for PHP 50'}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="requiresCode">Requires Code</Label>
-          <div className="flex items-center space-x-2 pt-2">
-            <Checkbox
-              id="requiresCode"
-              checked={watch('requiresCode')}
-              onCheckedChange={(checked) => setValue('requiresCode', !!checked)}
-              disabled={isLoading}
-            />
-            <Label htmlFor="requiresCode" className="font-normal">
-              Code-based promotion (requires voucher code)
-            </Label>
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="appliesTo"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Applies To *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select scope" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="ORDER">Order Level</SelectItem>
+                    <SelectItem value="ITEM">Item Level</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="requiresCode"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Requires Code</FormLabel>
+                <div className="flex items-center space-x-2 pt-2">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isLoading}
+                    />
+                  </FormControl>
+                  <span className="text-sm font-normal">
+                    Code-based promotion (requires voucher code)
+                  </span>
+                </div>
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="validFrom"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Valid From</FormLabel>
+                <FormControl>
+                  <Input type="datetime-local" {...field} disabled={isLoading} />
+                </FormControl>
+                <FormDescription>Defaults to event start</FormDescription>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="validUntil"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Valid Until</FormLabel>
+                <FormControl>
+                  <Input type="datetime-local" {...field} disabled={isLoading} />
+                </FormControl>
+                <FormDescription>Defaults to event end</FormDescription>
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="maxRedemptions"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Max Redemptions</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    {...field}
+                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                    value={field.value ?? ''}
+                    disabled={isLoading}
+                    placeholder="Global limit"
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="maxPerUser"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Max Per User</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    {...field}
+                    onChange={(e) => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                    value={field.value ?? ''}
+                    disabled={isLoading}
+                    placeholder="Per-user limit"
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {ticketTypes.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Eligible Ticket Types</p>
+            <p className="text-xs text-muted-foreground mb-2">
+              Select specific ticket types. Leave empty to apply to all types.
+            </p>
+            <div className="border rounded-lg p-4 max-h-48 overflow-y-auto">
+              {ticketTypes.map((ticketType) => (
+                <div key={ticketType.id} className="flex items-center space-x-2 py-2">
+                  <Checkbox
+                    id={`ticketType-${ticketType.id}`}
+                    checked={selectedTicketTypeIds.includes(ticketType.id)}
+                    onCheckedChange={() => toggleTicketType(ticketType.id)}
+                    disabled={isLoading}
+                  />
+                  <label htmlFor={`ticketType-${ticketType.id}`} className="text-sm font-normal cursor-pointer">
+                    {ticketType.name}
+                  </label>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </div>
+        )}
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="validFrom">Valid From *</Label>
-          <Input
-            id="validFrom"
-            type="datetime-local"
-            {...register('validFrom')}
-            disabled={isLoading}
-            className={errors.validFrom ? 'border-red-500' : ''}
-          />
-          {errors.validFrom && (
-            <p className="text-sm text-destructive">{errors.validFrom.message}</p>
-          )}
-        </div>
+        {requiresCode && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Voucher Codes</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => append({ code: '', maxRedemptions: undefined })}
+                disabled={isLoading}
+              >
+                <Plus className="mr-1 h-3 w-3" />
+                Add Code
+              </Button>
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="validUntil">Valid Until *</Label>
-          <Input
-            id="validUntil"
-            type="datetime-local"
-            {...register('validUntil')}
-            disabled={isLoading}
-            className={errors.validUntil ? 'border-red-500' : ''}
-          />
-          {errors.validUntil && (
-            <p className="text-sm text-destructive">{errors.validUntil.message}</p>
-          )}
-        </div>
-      </div>
+            {fields.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No codes yet. Add codes now or manage them later.
+              </p>
+            )}
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="maxRedemptions">Max Redemptions</Label>
-          <Input
-            id="maxRedemptions"
-            type="number"
-            {...register('maxRedemptions', { valueAsNumber: true, setValueAs: (v) => v === '' ? undefined : Number(v) })}
-            disabled={isLoading}
-            placeholder="Global limit"
-            className={errors.maxRedemptions ? 'border-red-500' : ''}
-          />
-          {errors.maxRedemptions && (
-            <p className="text-sm text-destructive">{errors.maxRedemptions.message}</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="maxPerUser">Max Per User</Label>
-          <Input
-            id="maxPerUser"
-            type="number"
-            {...register('maxPerUser', { valueAsNumber: true, setValueAs: (v) => v === '' ? undefined : Number(v) })}
-            disabled={isLoading}
-            placeholder="Per-user limit"
-            className={errors.maxPerUser ? 'border-red-500' : ''}
-          />
-          {errors.maxPerUser && (
-            <p className="text-sm text-destructive">{errors.maxPerUser.message}</p>
-          )}
-        </div>
-      </div>
-
-      {ticketTypes.length > 0 && (
-        <div className="space-y-2">
-          <Label>Eligible Ticket Types</Label>
-          <p className="text-xs text-muted-foreground mb-2">
-            Select specific ticket types. Leave empty to apply to all types.
-          </p>
-          <div className="border rounded-lg p-4 max-h-48 overflow-y-auto">
-            {ticketTypes.map((ticketType) => (
-              <div key={ticketType.id} className="flex items-center space-x-2 py-2">
-                <Checkbox
-                  id={`ticketType-${ticketType.id}`}
-                  checked={selectedTicketTypeIds.includes(ticketType.id)}
-                  onCheckedChange={() => toggleTicketType(ticketType.id)}
-                  disabled={isLoading}
+            {fields.map((field, index) => (
+              <div key={field.id} className="flex items-start gap-2">
+                <FormField
+                  control={form.control}
+                  name={`codes.${index}.code`}
+                  render={({ field: codeField }) => (
+                    <FormItem className="flex-1">
+                      <FormControl>
+                        <Input
+                          {...codeField}
+                          placeholder="e.g., EARLYBIRD20"
+                          disabled={isLoading}
+                          className="uppercase"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-                <Label htmlFor={`ticketType-${ticketType.id}`} className="font-normal cursor-pointer">
-                  {ticketType.name} ({ticketType.kind})
-                </Label>
+                <FormField
+                  control={form.control}
+                  name={`codes.${index}.maxRedemptions`}
+                  render={({ field: maxField }) => (
+                    <FormItem className="w-32">
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...maxField}
+                          onChange={(e) => maxField.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                          value={maxField.value ?? ''}
+                          placeholder="Max uses"
+                          disabled={isLoading}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => remove(index)}
+                  disabled={isLoading}
+                  className="shrink-0"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? 'Creating...' : 'Create Promotion'}
-        </Button>
-      </div>
-    </form>
+        <div className="flex justify-end gap-2 pt-4">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? 'Creating...' : 'Create Promotion'}
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 }

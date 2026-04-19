@@ -26,13 +26,14 @@ export function generateTicketCode(): string {
 
 /**
  * Generate tickets for all items in an order within a transaction.
+ * Table items generate `capacity` tickets each. Ticket type items generate `quantity` tickets.
  */
 export async function generateTicketsForOrder(
   tx: Prisma.TransactionClient,
   order: {
     id: string;
     eventId: string;
-    items: Array<{ id: string; ticketTypeId: string; seatId: string | null; quantity: number }>;
+    items: Array<{ id: string; ticketTypeId: string | null; tableId: string | null; quantity: number }>;
   },
   attendees: Array<{ firstName?: string; lastName?: string; email?: string; phone?: string | null }>,
   ownerId: string,
@@ -41,28 +42,57 @@ export async function generateTicketsForOrder(
   let attendeeIndex = 0;
 
   for (const item of order.items) {
-    for (let i = 0; i < item.quantity; i++) {
-      const attendee = attendees?.[attendeeIndex];
+    if (item.tableId) {
+      // Table purchase — generate one ticket per seat (capacity)
+      const table = await tx.table.findUnique({ where: { id: item.tableId } });
+      if (!table) throw new Error(`Table ${item.tableId} not found`);
 
-      const ticket = await tx.ticket.create({
-        data: {
-          ticketCode: generateTicketCode(),
-          orderId: order.id,
-          orderItemId: item.id,
-          eventId: order.eventId,
-          ticketTypeId: item.ticketTypeId,
-          seatId: item.seatId,
-          ownerId,
-          holderFirstName: attendee?.firstName || null,
-          holderLastName: attendee?.lastName || null,
-          holderEmail: attendee?.email || null,
-          holderPhone: attendee?.phone || null,
-          status: 'ACTIVE',
-        },
-      });
+      for (let i = 0; i < table.capacity; i++) {
+        const attendee = attendees?.[attendeeIndex];
 
-      tickets.push(ticket);
-      attendeeIndex++;
+        const ticket = await tx.ticket.create({
+          data: {
+            ticketCode: generateTicketCode(),
+            orderId: order.id,
+            orderItemId: item.id,
+            eventId: order.eventId,
+            tableId: item.tableId,
+            ownerId,
+            holderFirstName: attendee?.firstName || null,
+            holderLastName: attendee?.lastName || null,
+            holderEmail: attendee?.email || null,
+            holderPhone: attendee?.phone || null,
+            status: 'ACTIVE',
+          },
+        });
+
+        tickets.push(ticket);
+        attendeeIndex++;
+      }
+    } else if (item.ticketTypeId) {
+      // Ticket type purchase
+      for (let i = 0; i < item.quantity; i++) {
+        const attendee = attendees?.[attendeeIndex];
+
+        const ticket = await tx.ticket.create({
+          data: {
+            ticketCode: generateTicketCode(),
+            orderId: order.id,
+            orderItemId: item.id,
+            eventId: order.eventId,
+            ticketTypeId: item.ticketTypeId,
+            ownerId,
+            holderFirstName: attendee?.firstName || null,
+            holderLastName: attendee?.lastName || null,
+            holderEmail: attendee?.email || null,
+            holderPhone: attendee?.phone || null,
+            status: 'ACTIVE',
+          },
+        });
+
+        tickets.push(ticket);
+        attendeeIndex++;
+      }
     }
   }
 
@@ -127,16 +157,23 @@ export async function cancelExpiredOrder(orderId: string): Promise<void> {
 
   await prisma.$transaction(async (tx) => {
     for (const item of order.items) {
-      await tx.ticketType.update({
-        where: { id: item.ticketTypeId },
-        data: { quantitySold: { decrement: item.quantity } },
-      });
-
-      if (item.priceTierId) {
-        await tx.ticketTypePriceTier.update({
-          where: { id: item.priceTierId },
-          data: { allocationSold: { decrement: item.quantity } },
+      if (item.tableId) {
+        await tx.table.update({
+          where: { id: item.tableId },
+          data: { quantitySold: { decrement: 1 } },
         });
+      } else if (item.ticketTypeId) {
+        await tx.ticketType.update({
+          where: { id: item.ticketTypeId },
+          data: { quantitySold: { decrement: item.quantity } },
+        });
+
+        if (item.priceTierId) {
+          await tx.ticketTypePriceTier.update({
+            where: { id: item.priceTierId },
+            data: { allocationSold: { decrement: item.quantity } },
+          });
+        }
       }
     }
 
@@ -227,6 +264,7 @@ export async function confirmOrderFromPayment(
       items: {
         include: {
           ticketType: true,
+          table: true,
         },
       },
       tenant: { select: { subdomain: true } },

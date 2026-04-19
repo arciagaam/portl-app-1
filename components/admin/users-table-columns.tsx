@@ -104,6 +104,7 @@ export const columns: ColumnDef<UserRow>[] = [
     id: 'actions',
     cell: ({ row, table }) => {
       const user = row.original
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const meta = table.options.meta as any
 
       return (

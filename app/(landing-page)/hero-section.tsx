@@ -1,36 +1,40 @@
-import { ArrowDown } from 'lucide-react';
+'use client';
+
+import { ChevronDown } from 'lucide-react';
 
 export default function HeroSection() {
+  const scrollToHighlights = () => {
+    document.getElementById('highlights')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
-    <section className="relative min-h-screen flex flex-col justify-center hero-glow pt-24 pb-16 px-6 md:px-12">
-      <div className="max-w-7xl mx-auto w-full flex flex-col gap-12">
-        {/* Headline */}
-        <div className="flex flex-col gap-4">
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-light tracking-tight leading-[1.05]">
-            Your portal to
-            <br />
-            <span className="font-serif italic text-gradient-purple">nightlife</span>
-          </h1>
-          <p className="text-muted-foreground text-lg md:text-xl max-w-lg leading-relaxed mt-2">
-            Discover, book, and experience the best events in your city.
-          </p>
-        </div>
+    <section className="relative min-h-screen flex flex-col justify-center pt-20 pb-16 px-6 md:px-12 overflow-hidden">
+      {/* Subtle background glow */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-white/[0.02] rounded-full blur-[120px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-white/[0.015] rounded-full blur-[100px]" />
+      </div>
 
-        {/* Preview Thumbnails */}
-        <div className="flex gap-4">
-          <div className="w-32 h-44 md:w-40 md:h-56 bg-muted rounded-sm" />
-          <div className="w-32 h-44 md:w-40 md:h-56 bg-muted rounded-sm" />
-          <div className="w-32 h-44 md:w-40 md:h-56 bg-muted rounded-sm" />
-        </div>
+      <div className="max-w-7xl mx-auto w-full flex flex-col items-center justify-center flex-1 relative">
+        {/* Center headline */}
+        <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-light tracking-tight leading-[1.1] text-center">
+          Infinite
+          <br />
+          <span className="font-serif italic text-landing-accent">experiences</span>
+          <br />
+          one <span className="font-semibold">Portl</span>
+        </h1>
 
-        {/* Bottom Bar */}
-        <div className="flex items-center justify-between border-t border-border pt-6">
-          <span className="label-editorial">See Events</span>
-          <div className="flex items-center gap-2 label-editorial">
-            <span>Scroll Now</span>
-            <ArrowDown className="size-3.5 animate-scroll-bounce" />
+        {/* Scroll indicator */}
+        <button
+          onClick={scrollToHighlights}
+          className="mt-16 flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          aria-label="Scroll to highlights"
+        >
+          <div className="w-8 h-8 rounded-full border border-border flex items-center justify-center">
+            <ChevronDown className="size-4 animate-scroll-bounce" />
           </div>
-        </div>
+        </button>
       </div>
     </section>
   );

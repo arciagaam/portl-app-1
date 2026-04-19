@@ -66,7 +66,7 @@ export function AgreementsForm({ initialData, onSubmit }: AgreementsFormProps) {
                   Terms of Service
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  I agree to the platform's Terms of Service and understand my obligations as an organizer.
+                  I agree to the platform&apos;s Terms of Service and understand my obligations as an organizer.
                   <button className="text-primary hover:underline ml-1">
                     View Terms of Service
                   </button>

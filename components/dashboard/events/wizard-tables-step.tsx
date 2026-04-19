@@ -128,7 +128,7 @@ export function WizardTablesStep({
               <div className="flex-1 min-w-0">
                 <p className="font-medium">{table.label}</p>
                 <p className="text-sm text-muted-foreground">
-                  {table.capacity} seats &middot; {table.mode}
+                  {table.capacity} seats
                 </p>
               </div>
             </div>

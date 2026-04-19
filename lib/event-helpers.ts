@@ -15,42 +15,69 @@ import type {
   TicketTypeFormData,
   PriceTierFormData,
   PromotionFormData,
+  InlinePromotionFormData,
   VoucherCodeFormData,
   EventPromoterFormData,
+  TicketTypeWithPromotionFormData,
+  TableWithPromotionFormData,
 } from '@/lib/validations/events';
+
+// ============================================================================
+// PROMOTION INPUT CONVERSION
+// ============================================================================
+
+/**
+ * Converts simplified promotion form input to DB format:
+ * - Plain percentage (0-100) → basis points (0-10000)
+ * - Missing dates → event start/end dates
+ */
+export function convertPromotionInput(
+  data: InlinePromotionFormData,
+  eventStartDate: Date,
+  eventEndDate: Date,
+) {
+  return {
+    name: data.name,
+    description: data.description,
+    requiresCode: data.requiresCode,
+    discountType: data.discountType,
+    discountValue: data.discountType === 'PERCENT'
+      ? Math.round(data.discountValue * 100) // 10% → 1000 basis points
+      : data.discountValue,
+    appliesTo: data.appliesTo,
+    validFrom: data.validFrom ? new Date(data.validFrom) : eventStartDate,
+    validUntil: data.validUntil ? new Date(data.validUntil) : eventEndDate,
+    maxRedemptions: data.maxRedemptions ?? null,
+    maxPerUser: data.maxPerUser ?? null,
+  };
+}
 
 // ============================================================================
 // TABLES
 // ============================================================================
 
 export async function createTable(eventId: string, data: TableFormData) {
-  return prisma.$transaction(async (tx) => {
-    const table = await tx.table.create({
-      data: {
-        eventId,
-        label: data.label,
-        capacity: data.capacity,
-        minSpend: data.minSpend,
-        notes: data.notes,
-        mode: data.mode,
-      },
-    });
-
-    const seats = [];
-    for (let i = 1; i <= data.capacity; i++) {
-      seats.push({ tableId: table.id, seatIndex: i });
-    }
-
-    await tx.seat.createMany({ data: seats });
-
-    return table;
+  return prisma.table.create({
+    data: {
+      eventId,
+      label: data.label,
+      description: data.description,
+      imageUrl: data.imageUrl ?? null,
+      capacity: data.capacity,
+      ticketPrice: data.ticketPrice,
+      requirementType: data.requirementType ?? null,
+      minSpend: data.requirementType === 'MINIMUM_SPEND' ? data.minSpend : null,
+      bottleCount: data.requirementType === 'BOTTLE_REQUIREMENT' ? data.bottleCount : null,
+      transferrable: data.transferrable,
+      cancellable: data.cancellable,
+      notes: data.notes,
+    },
   });
 }
 
 export async function bulkCreateTables(eventId: string, data: BulkTableFormData) {
   return prisma.$transaction(async (tx) => {
     const tables = [];
-    const allSeats = [];
 
     for (let num = data.startNumber; num <= data.endNumber; num++) {
       const label = `${data.prefix}${num}`;
@@ -59,21 +86,19 @@ export async function bulkCreateTables(eventId: string, data: BulkTableFormData)
         data: {
           eventId,
           label,
+          description: data.description,
+          imageUrl: data.imageUrl ?? null,
           capacity: data.capacity,
-          minSpend: data.minSpend,
-          mode: data.mode,
+          ticketPrice: data.ticketPrice,
+          requirementType: data.requirementType ?? null,
+          minSpend: data.requirementType === 'MINIMUM_SPEND' ? data.minSpend : null,
+          bottleCount: data.requirementType === 'BOTTLE_REQUIREMENT' ? data.bottleCount : null,
+          transferrable: data.transferrable,
+          cancellable: data.cancellable,
         },
       });
 
       tables.push(table);
-
-      for (let i = 1; i <= data.capacity; i++) {
-        allSeats.push({ tableId: table.id, seatIndex: i });
-      }
-    }
-
-    if (allSeats.length > 0) {
-      await tx.seat.createMany({ data: allSeats });
     }
 
     return tables;
@@ -81,83 +106,24 @@ export async function bulkCreateTables(eventId: string, data: BulkTableFormData)
 }
 
 export async function updateTable(tableId: string, data: TableFormData) {
-  return prisma.$transaction(async (tx) => {
-    const existing = await tx.table.findUnique({ where: { id: tableId } });
-    if (!existing) throw new Error('Table not found');
+  const existing = await prisma.table.findUnique({ where: { id: tableId } });
+  if (!existing) throw new Error('Table not found');
 
-    const updatedTable = await tx.table.update({
-      where: { id: tableId },
-      data: {
-        label: data.label,
-        capacity: data.capacity,
-        minSpend: data.minSpend,
-        notes: data.notes,
-        mode: data.mode,
-      },
-    });
-
-    if (data.capacity !== existing.capacity) {
-      await tx.seat.deleteMany({ where: { tableId } });
-      const seats = [];
-      for (let i = 1; i <= data.capacity; i++) {
-        seats.push({ tableId, seatIndex: i });
-      }
-      await tx.seat.createMany({ data: seats });
-    }
-
-    return updatedTable;
-  });
-}
-
-export async function updateTableCapacity(tableId: string, newCapacity: number) {
-  return prisma.$transaction(async (tx) => {
-    const table = await tx.table.findUnique({
-      where: { id: tableId },
-      include: { seats: true },
-    });
-
-    if (!table) {
-      throw new Error('Table not found');
-    }
-
-    await tx.seat.deleteMany({ where: { tableId } });
-
-    const updatedTable = await tx.table.update({
-      where: { id: tableId },
-      data: { capacity: newCapacity },
-    });
-
-    const seats = [];
-    for (let i = 1; i <= newCapacity; i++) {
-      seats.push({ tableId, seatIndex: i });
-    }
-
-    await tx.seat.createMany({ data: seats });
-
-    return updatedTable;
-  });
-}
-
-export async function regenerateSeats(tableId: string) {
-  return prisma.$transaction(async (tx) => {
-    const table = await tx.table.findUnique({
-      where: { id: tableId },
-    });
-
-    if (!table) {
-      throw new Error('Table not found');
-    }
-
-    await tx.seat.deleteMany({ where: { tableId } });
-
-    const seats = [];
-    for (let i = 1; i <= table.capacity; i++) {
-      seats.push({ tableId, seatIndex: i });
-    }
-
-    await tx.seat.createMany({ data: seats });
-
-    return table;
+  return prisma.table.update({
+    where: { id: tableId },
+    data: {
+      label: data.label,
+      description: data.description,
+      imageUrl: data.imageUrl ?? null,
+      capacity: data.capacity,
+      ticketPrice: data.ticketPrice,
+      requirementType: data.requirementType ?? null,
+      minSpend: data.requirementType === 'MINIMUM_SPEND' ? data.minSpend : null,
+      bottleCount: data.requirementType === 'BOTTLE_REQUIREMENT' ? data.bottleCount : null,
+      transferrable: data.transferrable,
+      cancellable: data.cancellable,
+      notes: data.notes,
+    },
   });
 }
 
@@ -195,39 +161,15 @@ export async function deleteTable(tableId: string) {
 // ============================================================================
 
 export async function createTicketType(eventId: string, data: TicketTypeFormData) {
-  if (data.kind === 'TABLE' || data.kind === 'SEAT') {
-    if (!data.tableId) {
-      throw new Error('Table is required for TABLE and SEAT ticket types');
-    }
-
-    const table = await prisma.table.findUnique({
-      where: { id: data.tableId },
-    });
-
-    if (!table) {
-      throw new Error('Table not found');
-    }
-
-    if (data.kind === 'TABLE') {
-      data.quantityTotal = 1;
-    }
-
-    if (data.kind === 'SEAT') {
-      data.quantityTotal = table.capacity;
-    }
-  }
-
   return prisma.ticketType.create({
     data: {
       eventId,
       name: data.name,
       description: data.description,
-      kind: data.kind,
       basePrice: data.basePrice,
       quantityTotal: data.quantityTotal,
       transferrable: data.transferrable,
       cancellable: data.cancellable,
-      tableId: data.tableId || null,
       imageUrl: data.imageUrl ?? null,
     },
   });
@@ -248,36 +190,8 @@ export async function updateTicketType(
 
   // Enforce restrictions when tickets have been sold
   if (options?.enforceSalesProtection && existingTicketType.quantitySold > 0) {
-    if (data.kind !== existingTicketType.kind) {
-      throw new Error('Cannot change ticket kind after tickets have been sold');
-    }
-    if (data.tableId !== existingTicketType.tableId) {
-      throw new Error('Cannot change table assignment after tickets have been sold');
-    }
     if (data.quantityTotal !== undefined && data.quantityTotal !== null && data.quantityTotal < existingTicketType.quantitySold) {
       throw new Error(`Total quantity cannot be less than ${existingTicketType.quantitySold} tickets already sold`);
-    }
-  }
-
-  if (data.kind === 'TABLE' || data.kind === 'SEAT') {
-    if (!data.tableId) {
-      throw new Error('Table is required for TABLE and SEAT ticket types');
-    }
-
-    const table = await prisma.table.findUnique({
-      where: { id: data.tableId },
-    });
-
-    if (!table) {
-      throw new Error('Table not found');
-    }
-
-    if (data.kind === 'TABLE') {
-      data.quantityTotal = 1;
-    }
-
-    if (data.kind === 'SEAT') {
-      data.quantityTotal = table.capacity;
     }
   }
 
@@ -286,12 +200,10 @@ export async function updateTicketType(
     data: {
       name: data.name,
       description: data.description,
-      kind: data.kind,
       basePrice: data.basePrice,
       quantityTotal: data.quantityTotal,
       transferrable: data.transferrable,
       cancellable: data.cancellable,
-      tableId: data.tableId || null,
       imageUrl: data.imageUrl ?? null,
     },
   });
@@ -316,6 +228,115 @@ export async function deleteTicketType(
   await prisma.ticketType.delete({ where: { id: ticketTypeId } });
 
   return ticketType;
+}
+
+// ============================================================================
+// COMBINED CREATION (TICKET TYPE / TABLE + OPTIONAL PROMOTION)
+// ============================================================================
+
+export async function createTicketTypeWithPromotion(eventId: string, data: TicketTypeWithPromotionFormData) {
+  return prisma.$transaction(async (tx) => {
+    const event = await tx.event.findUniqueOrThrow({
+      where: { id: eventId },
+      select: { startDate: true, endDate: true, startTime: true, endTime: true },
+    });
+
+    const ticketType = await tx.ticketType.create({
+      data: {
+        eventId,
+        name: data.name,
+        description: data.description,
+        basePrice: data.basePrice,
+        quantityTotal: data.quantityTotal,
+        transferrable: data.transferrable,
+        cancellable: data.cancellable,
+        imageUrl: data.imageUrl ?? null,
+      },
+    });
+
+    let promotion = null;
+    if (data.promotion) {
+      const eventStart = new Date(`${event.startDate}T${event.startTime}`);
+      const eventEnd = new Date(`${event.endDate}T${event.endTime}`);
+      const converted = convertPromotionInput(data.promotion, eventStart, eventEnd);
+
+      promotion = await tx.promotion.create({
+        data: { eventId, ...converted },
+      });
+
+      // Auto-scope to this ticket type
+      await tx.promotionTicketType.create({
+        data: { promotionId: promotion.id, ticketTypeId: ticketType.id },
+      });
+
+      // Create inline voucher codes
+      if (data.promotion.codes && data.promotion.codes.length > 0) {
+        await tx.voucherCode.createMany({
+          data: data.promotion.codes.map((c) => ({
+            promotionId: promotion!.id,
+            code: c.code.toUpperCase(),
+            maxRedemptions: c.maxRedemptions ?? null,
+          })),
+        });
+      }
+    }
+
+    return { ticketType, promotion };
+  });
+}
+
+export async function createTableWithPromotion(eventId: string, data: TableWithPromotionFormData) {
+  return prisma.$transaction(async (tx) => {
+    const event = await tx.event.findUniqueOrThrow({
+      where: { id: eventId },
+      select: { startDate: true, endDate: true, startTime: true, endTime: true },
+    });
+
+    const table = await tx.table.create({
+      data: {
+        eventId,
+        label: data.label,
+        description: data.description,
+        imageUrl: data.imageUrl ?? null,
+        capacity: data.capacity,
+        ticketPrice: data.ticketPrice,
+        requirementType: data.requirementType ?? null,
+        minSpend: data.requirementType === 'MINIMUM_SPEND' ? data.minSpend : null,
+        bottleCount: data.requirementType === 'BOTTLE_REQUIREMENT' ? data.bottleCount : null,
+        transferrable: data.transferrable,
+        cancellable: data.cancellable,
+        notes: data.notes,
+      },
+    });
+
+    let promotion = null;
+    if (data.promotion) {
+      const promoData = {
+        ...data.promotion,
+        name: data.promotion.name || `Promo for Table ${data.label}`,
+      };
+      const eventStart = new Date(`${event.startDate}T${event.startTime}`);
+      const eventEnd = new Date(`${event.endDate}T${event.endTime}`);
+      const converted = convertPromotionInput(promoData, eventStart, eventEnd);
+
+      promotion = await tx.promotion.create({
+        data: { eventId, ...converted },
+      });
+
+      // Create inline voucher codes
+      if (data.promotion.codes && data.promotion.codes.length > 0) {
+        await tx.voucherCode.createMany({
+          data: data.promotion.codes.map((c) => ({
+            promotionId: promotion!.id,
+            code: c.code.toUpperCase(),
+            maxRedemptions: c.maxRedemptions ?? null,
+          })),
+        });
+      }
+    }
+
+    return { table, promotion };
+  });
 }
 
 // ============================================================================
@@ -373,19 +394,19 @@ export async function deletePriceTier(priceTierId: string) {
 
 export async function createPromotion(eventId: string, data: PromotionFormData) {
   return prisma.$transaction(async (tx) => {
+    const event = await tx.event.findUniqueOrThrow({
+      where: { id: eventId },
+      select: { startDate: true, endDate: true, startTime: true, endTime: true },
+    });
+
+    const eventStart = new Date(`${event.startDate}T${event.startTime}`);
+    const eventEnd = new Date(`${event.endDate}T${event.endTime}`);
+    const converted = convertPromotionInput(data, eventStart, eventEnd);
+
     const promotion = await tx.promotion.create({
       data: {
         eventId,
-        name: data.name,
-        description: data.description,
-        requiresCode: data.requiresCode,
-        discountType: data.discountType,
-        discountValue: data.discountValue,
-        appliesTo: data.appliesTo,
-        validFrom: new Date(data.validFrom),
-        validUntil: new Date(data.validUntil),
-        maxRedemptions: data.maxRedemptions,
-        maxPerUser: data.maxPerUser,
+        ...converted,
       },
     });
 
@@ -398,6 +419,17 @@ export async function createPromotion(eventId: string, data: PromotionFormData) 
       });
     }
 
+    // Create inline voucher codes if provided
+    if (data.codes && data.codes.length > 0) {
+      await tx.voucherCode.createMany({
+        data: data.codes.map((c) => ({
+          promotionId: promotion.id,
+          code: c.code.toUpperCase(),
+          maxRedemptions: c.maxRedemptions ?? null,
+        })),
+      });
+    }
+
     return promotion;
   });
 }
@@ -405,27 +437,21 @@ export async function createPromotion(eventId: string, data: PromotionFormData) 
 export async function updatePromotion(promotionId: string, data: PromotionFormData) {
   const existingPromotion = await prisma.promotion.findUnique({
     where: { id: promotionId },
+    include: { event: { select: { startDate: true, endDate: true, startTime: true, endTime: true } } },
   });
 
   if (!existingPromotion) {
     throw new Error('Promotion not found');
   }
 
+  const eventStart = new Date(`${existingPromotion.event.startDate}T${existingPromotion.event.startTime}`);
+  const eventEnd = new Date(`${existingPromotion.event.endDate}T${existingPromotion.event.endTime}`);
+  const converted = convertPromotionInput(data, eventStart, eventEnd);
+
   const result = await prisma.$transaction(async (tx) => {
     const promotion = await tx.promotion.update({
       where: { id: promotionId },
-      data: {
-        name: data.name,
-        description: data.description,
-        requiresCode: data.requiresCode,
-        discountType: data.discountType,
-        discountValue: data.discountValue,
-        appliesTo: data.appliesTo,
-        validFrom: new Date(data.validFrom),
-        validUntil: new Date(data.validUntil),
-        maxRedemptions: data.maxRedemptions,
-        maxPerUser: data.maxPerUser,
-      },
+      data: converted,
     });
 
     await tx.promotionTicketType.deleteMany({ where: { promotionId } });

@@ -130,17 +130,20 @@ export default async function TenantDashboardPage({
   ]
 
   return (
-    <div className="container mx-auto px-6 py-8 max-w-7xl space-y-8">
+    <div className="px-8 py-8 max-w-6xl space-y-10">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">
+            {tenant.name}
+          </p>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Welcome back, {user.name || 'Organizer'}. Here&apos;s what&apos;s happening with {tenant.name}.
+          <p className="text-sm text-muted-foreground mt-1">
+            Welcome back, {user.name || 'Organizer'}.
           </p>
         </div>
         {isApproved && (
-          <Button asChild>
+          <Button asChild size="lg">
             <Link href={`/dashboard/${subdomain}/events/new`}>
               <Plus className="mr-2 h-4 w-4" />
               Create Event
@@ -150,188 +153,171 @@ export default async function TenantDashboardPage({
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Events</CardTitle>
+      <div className="grid gap-px bg-border md:grid-cols-2 lg:grid-cols-4 border">
+        <div className="bg-background p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Events</span>
             <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{tenant._count?.events || 0}</div>
-            <p className="text-xs text-muted-foreground">+0 from last month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Attendees</CardTitle>
+          </div>
+          <p className="text-3xl font-bold tabular-nums">{tenant._count?.events || 0}</p>
+        </div>
+        <div className="bg-background p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Attendees</span>
             <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalAttendees.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">{stats.totalOrders} confirmed order{stats.totalOrders !== 1 ? 's' : ''}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+          </div>
+          <p className="text-3xl font-bold tabular-nums">{stats.totalAttendees.toLocaleString()}</p>
+          <p className="text-xs text-muted-foreground mt-1">{stats.totalOrders} confirmed order{stats.totalOrders !== 1 ? 's' : ''}</p>
+        </div>
+        <div className="bg-background p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Revenue</span>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(stats.totalRevenue / 100)}
-            </div>
-            <p className="text-xs text-muted-foreground">Lifetime revenue</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Status</CardTitle>
+          </div>
+          <p className="text-3xl font-bold tabular-nums">
+            {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(stats.totalRevenue / 100)}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">Lifetime</p>
+        </div>
+        <div className="bg-background p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Status</span>
             {isApproved ? (
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <CheckCircle2 className="h-4 w-4 text-foreground" />
             ) : (
-              <Clock className="h-4 w-4 text-amber-500" />
+              <Clock className="h-4 w-4 text-muted-foreground" />
             )}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold capitalize">
-              {isApproved ? 'Active' : 'Pending'}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {isApproved ? 'Account fully verified' : 'Complete verification'}
-            </p>
-          </CardContent>
-        </Card>
+          </div>
+          <p className="text-3xl font-bold">
+            {isApproved ? 'Active' : 'Pending'}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {isApproved ? 'Verified' : 'Complete verification'}
+          </p>
+        </div>
       </div>
 
       {/* Main Content */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <div className="col-span-4 lg:col-span-4 space-y-6">
+      <div className="grid gap-8 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-8">
           {!isApproved ? (
-            <Card className="border-l-4 border-l-blue-500">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Complete Your Registration</CardTitle>
-                    <CardDescription>
-                      Finish setting up your organizer profile to start hosting events.
-                    </CardDescription>
-                  </div>
-                  <Badge variant={isSubmitted ? "secondary" : "default"}>
-                    {isSubmitted ? 'Under Review' : 'In Progress'}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Stepper steps={steps} currentStep={application?.currentStep || 1} />
-
-                {!isSubmitted && !isRejected && (
-                  <div className="mt-6 flex justify-end">
-                    <Button asChild>
-                      <Link href={`/dashboard/${subdomain}/apply?step=${application?.currentStep}`}>
-                        {isNotStarted ? 'Start Application' : 'Continue Application'}
-                      </Link>
-                    </Button>
-                  </div>
-                )}
-
-                {isSubmitted && (
-                  <div className="mt-4 p-4 bg-muted/50 rounded-lg flex items-center gap-3 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    We are reviewing your application. You will be notified via email once approved.
-                  </div>
-                )}
-
-                {isRejected && (
-                  <div className="mt-4 p-4 bg-red-50 dark:bg-red-950 text-red-800 dark:text-red-200 rounded-lg flex items-start gap-3 text-sm">
-                    <AlertCircle className="h-4 w-4 mt-0.5" />
+            <div className="border-l-2 border-l-foreground">
+              <Card className="border-l-0">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">Application Rejected</p>
-                      <p>{application?.reviewNotes || 'Please contact support.'}</p>
+                      <CardTitle>Complete Your Registration</CardTitle>
+                      <CardDescription className="mt-1">
+                        Finish setting up your organizer profile to start hosting events.
+                      </CardDescription>
                     </div>
+                    <Badge variant={isSubmitted ? 'secondary' : 'default'}>
+                      {isSubmitted ? 'Under Review' : 'In Progress'}
+                    </Badge>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent>
+                  <Stepper steps={steps} currentStep={application?.currentStep || 1} />
+
+                  {!isSubmitted && !isRejected && (
+                    <div className="mt-6 flex justify-end">
+                      <Button asChild>
+                        <Link href={`/dashboard/${subdomain}/apply?step=${application?.currentStep}`}>
+                          {isNotStarted ? 'Start Application' : 'Continue Application'}
+                        </Link>
+                      </Button>
+                    </div>
+                  )}
+
+                  {isSubmitted && (
+                    <div className="mt-4 p-4 bg-muted/50 flex items-center gap-3 text-sm text-muted-foreground border">
+                      <Clock className="h-4 w-4 shrink-0" />
+                      We are reviewing your application. You will be notified via email once approved.
+                    </div>
+                  )}
+
+                  {isRejected && (
+                    <div className="mt-4 p-4 border border-destructive/30 bg-destructive/5 flex items-start gap-3 text-sm">
+                      <AlertCircle className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
+                      <div>
+                        <p className="font-medium text-destructive">Application Rejected</p>
+                        <p className="text-muted-foreground mt-0.5">{application?.reviewNotes || 'Please contact support.'}</p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Events</CardTitle>
-                <CardDescription>
-                  Your most recent events and their status.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {recentEvents.length > 0 ? (
-                  <div className="space-y-4">
-                    {recentEvents.map((event) => (
-                      <Link
-                        key={event.id}
-                        href={`/dashboard/${subdomain}/events/${event.id}`}
-                        className="block p-4 border rounded-lg hover:bg-accent transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{event.name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(event.startDate).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <Badge variant={event.status === 'PUBLISHED' ? 'default' : 'secondary'}>
-                            {event.status}
-                          </Badge>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-10 text-muted-foreground">
-                    <p>No events found.</p>
-                    <Button variant="link" asChild className="mt-2">
-                      <Link href={`/dashboard/${subdomain}/events/new`}>Create your first event</Link>
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold tracking-tight">Recent Events</h2>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href={`/dashboard/${subdomain}/events`}>
+                    View all
+                  </Link>
+                </Button>
+              </div>
+              {recentEvents.length > 0 ? (
+                <div className="divide-y border">
+                  {recentEvents.map((event) => (
+                    <Link
+                      key={event.id}
+                      href={`/dashboard/${subdomain}/events/${event.id}`}
+                      className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{event.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {new Date(event.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      </div>
+                      <Badge variant={event.status === 'PUBLISHED' ? 'default' : 'secondary'} className="ml-3 shrink-0">
+                        {event.status}
+                      </Badge>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="border border-dashed p-12 text-center">
+                  <p className="text-sm text-muted-foreground">No events yet.</p>
+                  <Button variant="outline" size="sm" asChild className="mt-4">
+                    <Link href={`/dashboard/${subdomain}/events/new`}>Create your first event</Link>
+                  </Button>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
         {/* Sidebar */}
-        <div className="col-span-4 lg:col-span-3 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notifications</CardTitle>
-              <CardDescription>Latest updates for your account</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight mb-4">Notifications</h2>
+            <div className="space-y-3">
               {isApproved ? (
-                <div className="flex items-start space-x-4 rounded-md p-2 transition-all hover:bg-muted/50">
-                  <div className="mt-1 bg-green-100 dark:bg-green-900 p-1 rounded-full">
-                    <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium leading-none">Account Approved</p>
-                    <p className="text-xs text-muted-foreground">
+                <div className="flex items-start gap-3 p-3 border">
+                  <CheckCircle2 className="h-4 w-4 mt-0.5 text-foreground shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Account Approved</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       Your organizer account has been fully approved.
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="flex items-start space-x-4 rounded-md p-2 transition-all hover:bg-muted/50">
-                  <div className="mt-1 bg-blue-100 dark:bg-blue-900 p-1 rounded-full">
-                    <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium leading-none">Setup Required</p>
-                    <p className="text-xs text-muted-foreground">
-                      Please complete the application steps to start.
+                <div className="flex items-start gap-3 p-3 border">
+                  <Clock className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Setup Required</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Complete the application steps to start.
                     </p>
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
-
+            </div>
+          </div>
         </div>
       </div>
     </div>

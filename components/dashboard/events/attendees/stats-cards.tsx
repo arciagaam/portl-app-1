@@ -1,4 +1,3 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, UserCheck, UserX } from 'lucide-react';
 import type { AttendeeStats } from './types';
 
@@ -8,39 +7,33 @@ interface StatsCardsProps {
 
 export function StatsCards({ stats }: StatsCardsProps) {
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Attendees</CardTitle>
+    <div className="grid gap-px bg-border md:grid-cols-3 border">
+      <div className="bg-background p-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Total Attendees</span>
           <Users className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{stats.total}</div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Checked In</CardTitle>
+        </div>
+        <p className="text-3xl font-bold tabular-nums">{stats.total}</p>
+      </div>
+      <div className="bg-background p-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Checked In</span>
           <UserCheck className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{stats.checkedIn}</div>
-          {stats.total > 0 && (
-            <p className="text-xs text-muted-foreground">
-              {Math.round((stats.checkedIn / stats.total) * 100)}% of total
-            </p>
-          )}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Not Yet Checked In</CardTitle>
+        </div>
+        <p className="text-3xl font-bold tabular-nums">{stats.checkedIn}</p>
+        {stats.total > 0 && (
+          <p className="text-xs text-muted-foreground mt-1">
+            {Math.round((stats.checkedIn / stats.total) * 100)}% of total
+          </p>
+        )}
+      </div>
+      <div className="bg-background p-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Remaining</span>
           <UserX className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{stats.remaining}</div>
-        </CardContent>
-      </Card>
+        </div>
+        <p className="text-3xl font-bold tabular-nums">{stats.remaining}</p>
+      </div>
     </div>
   );
 }

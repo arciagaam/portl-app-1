@@ -67,7 +67,13 @@ export async function getOrderByIdAction(
         items: {
           include: {
             ticketType: true,
-            tickets: true,
+            table: true,
+            tickets: {
+              include: {
+                ticketType: true,
+                table: true,
+              },
+            },
           },
         },
         tickets: {
@@ -78,6 +84,7 @@ export async function getOrderByIdAction(
               },
             },
             ticketType: true,
+            table: true,
             order: true,
           },
         },
@@ -134,6 +141,7 @@ export async function getMyTicketsAction(): Promise<{ data: TicketWithRelations[
           },
         },
         ticketType: true,
+        table: true,
         order: true,
       },
       orderBy: {
@@ -169,6 +177,7 @@ export async function getTicketByIdAction(
           },
         },
         ticketType: true,
+        table: true,
         order: true,
       },
     });
@@ -251,6 +260,7 @@ export async function assignTicketHolderAction(
           },
         },
         ticketType: true,
+        table: true,
         order: true,
       },
     });
@@ -300,6 +310,7 @@ export async function getTicketsByOrderIdAction(
           },
         },
         ticketType: true,
+        table: true,
         order: true,
       },
       orderBy: {
@@ -351,6 +362,7 @@ export async function getUpcomingTicketsAction(): Promise<{ data: TicketWithRela
           },
         },
         ticketType: true,
+        table: true,
         order: true,
       },
       orderBy: {

@@ -14,10 +14,8 @@ export function GallerySection({ event, tenantSubdomain }: GallerySectionProps) 
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold">Gallery</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {event.images.length} of {MAX_IMAGES} images
-          </p>
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-1">{event.images.length} / {MAX_IMAGES} images</p>
+          <h2 className="text-2xl font-semibold tracking-tight">Gallery</h2>
         </div>
         <AddImageDialog
           eventId={event.id}

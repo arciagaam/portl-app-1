@@ -14,12 +14,6 @@ interface TicketTypesDisplayProps {
   ticketTypes: TicketTypeWithPriceTiers[];
 }
 
-const kindLabels: Record<string, string> = {
-  GENERAL: 'General Admission',
-  TABLE: 'Table Booking',
-  SEAT: 'Seat',
-};
-
 export function TicketTypesDisplay({ eventId, ticketTypes }: TicketTypesDisplayProps) {
   if (ticketTypes.length === 0) {
     return (
@@ -101,9 +95,6 @@ export function TicketTypesDisplay({ eventId, ticketTypes }: TicketTypesDisplayP
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold">{ticketType.name}</h3>
-                    <Badge variant="secondary" className="text-xs">
-                      {kindLabels[ticketType.kind] || ticketType.kind}
-                    </Badge>
                     {availability && (
                       <Badge variant={isSoldOut ? 'outline' : 'destructive'} className="text-xs">
                         {availability}
